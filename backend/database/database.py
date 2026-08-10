@@ -3,12 +3,8 @@ database/database.py
 --------------------
 SQLAlchemy engine and session factory.
 
-Phase 2 change:
 - Now reads DATABASE_URL from the environment (via .env).
-- Supports both SQLite (local dev / Streamlit fallback) and
-  PostgreSQL (Supabase production).
-- For PostgreSQL, removes the SQLite-only connect_args.
-- For SQLite, keeps check_same_thread=False for Streamlit compatibility.
+- Connects to PostgreSQL (Supabase production).
 
 The engine is created once at module import.
 All services and the FastAPI app share this same engine.
@@ -36,13 +32,6 @@ DATABASE_URL = settings.DATABASE_URL
 if not DATABASE_URL:
     raise ValueError("CRITICAL: DATABASE_URL is not set in the environment or .env file. Database connection cannot be established.")
 
-
-# ── Engine configuration ──────────────────────────────────────────────────────
-# SQLite needs check_same_thread=False for Streamlit's multi-thread model.
-# PostgreSQL does not support this arg — it's omitted for non-SQLite.
-
-if DATABASE_URL.startswith("sqlite"):
-    raise ValueError("CRITICAL: SQLite is no longer supported. Please use a Supabase PostgreSQL connection.")
 
 # PostgreSQL (Supabase)
 # pool_pre_ping=True: test connection health before each checkout
