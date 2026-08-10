@@ -1,12 +1,12 @@
 import pytest
-from utils.rsml.ast import (
+from backend.utils.rsml.ast import (
     TextNode,
     IsolatedTagNode,
     SpanStartNode,
     SpanEndNode,
     BracketNode,
 )
-from utils.rsml.formatter import RSMLFormatter
+from backend.utils.rsml.formatter import RSMLFormatter
 
 def test_rsml_formatter():
     formatter = RSMLFormatter()

@@ -1,11 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List
 from sqlalchemy.orm import Session
+import logging
 from backend.core.dependencies import get_current_user, get_db
 from backend.schemas.annotation import AnnotationResponse, AnnotationCreate, ReviewCreate, AnnotationVersionResponse, RestoreVersionResponse, ProcessRsmlRequest
-from database.models import User
-from services.annotation_service import save_annotation, get_annotation_versions, restore_annotation_version, process_transcript
-from services.reviewer_service import approve, add_comment
+from backend.database.models import User
+from backend.services.annotation_service import save_annotation, get_annotation_versions, restore_annotation_version, process_transcript
+from backend.services.reviewer_service import approve, add_comment
+import os
+
+logger = logging.getLogger("akshara.api")
 
 router = APIRouter(prefix="/annotations", tags=["annotations"])
 
@@ -21,7 +25,7 @@ def create_annotation(payload: AnnotationCreate, current_user: User = Depends(ge
     """
     Save a new annotation.
     """
-    from services.annotation_service import get_annotation
+    from backend.services.annotation_service import get_annotation
     annotation = get_annotation(payload.audio_id, current_user.id)
     if not annotation:
         raise HTTPException(status_code=400, detail="Could not retrieve or create annotation for this task")
@@ -45,8 +49,8 @@ def get_annotation_by_audio(
     Get the current annotation for a given audio task.
     """
     role_val = current_user.role.value if hasattr(current_user.role, "value") else current_user.role
-    from database.models import AudioFile, Annotation
-    from database.enums import AnnotationState
+    from backend.database.models import AudioFile, Annotation
+    from backend.database.enums import AnnotationState
 
     annotation = db.query(Annotation).filter(Annotation.audio_id == audio_id).order_by(Annotation.updated_at.desc()).first()
 
@@ -78,7 +82,7 @@ def submit_annotation_endpoint(audio_id: str, current_user: User = Depends(get_c
     """
     Submit an annotation (finalize draft, transition to SUBMITTED).
     """
-    from services.annotation_service import get_annotation, submit_annotation
+    from backend.services.annotation_service import get_annotation, submit_annotation
     annotation = get_annotation(audio_id, current_user.id)
     if not annotation:
         raise HTTPException(status_code=404, detail="Annotation not found for this audio task")
@@ -100,7 +104,7 @@ def create_review(payload: ReviewCreate, current_user: User = Depends(get_curren
     # Assuming we need an annotation ID, but our ReviewCreate has audio_id?
     # Wait, reviewer_service requires annotation_id. 
     # Let's get the annotation_id from audio_id.
-    from services.reviewer_service import get_annotation_for_task
+    from backend.services.reviewer_service import get_annotation_for_task
     annotation = get_annotation_for_task(payload.audio_id)
     if not annotation:
         raise HTTPException(status_code=404, detail="Annotation not found for this audio task")
@@ -162,8 +166,8 @@ def export_annotation(
     import zipfile
     from pathlib import Path
     from fastapi.responses import Response
-    from database.models import AudioFile, Annotation
-    from database.enums import AudioStatus, AnnotationState
+    from backend.database.models import AudioFile, Annotation
+    from backend.database.enums import AudioStatus, AnnotationState
 
     role_val = current_user.role.value if hasattr(current_user.role, "value") else current_user.role
     if role_val not in ("ADMIN", "SUPER_ADMIN"):
@@ -211,4 +215,165 @@ def export_annotation(
         content=zip_buffer.getvalue(),
         media_type="application/zip",
         headers={"Content-Disposition": f"attachment; filename={stem}_export.zip"}
+    )
+
+
+# ── SRT Export ────────────────────────────────────────────────────────────────
+
+def _seconds_to_srt_timestamp(seconds: float) -> str:
+    """
+    Convert a float number of seconds to SRT timestamp format.
+    SRT uses commas for milliseconds: HH:MM:SS,mmm
+    """
+    total_ms = int(round(seconds * 1000))
+    ms = total_ms % 1000
+    total_s = total_ms // 1000
+    s = total_s % 60
+    total_m = total_s // 60
+    m = total_m % 60
+    h = total_m // 60
+    return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+
+
+def _build_srt(segments: list) -> str:
+    """
+    Build an SRT subtitle string from a list of {start, end, text} dicts.
+    Uses UTF-8-safe string operations only. Caller must encode as UTF-8.
+    """
+    lines = []
+    for i, seg in enumerate(segments, start=1):
+        start_ts = _seconds_to_srt_timestamp(float(seg.get("start", 0)))
+        end_ts = _seconds_to_srt_timestamp(float(seg.get("end", 0)))
+        text = (seg.get("transcript") or seg.get("text") or "").strip()
+        lines.append(str(i))
+        lines.append(f"{start_ts} --> {end_ts}")
+        lines.append(text)
+        lines.append("")  # blank line between blocks
+    return "\n".join(lines)
+
+
+@router.get("/{audio_id}/export-srt")
+def export_annotation_srt(
+    audio_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Export a fully approved annotation as a ZIP archive containing:
+      1. original_audio.wav  — the original uploaded WAV (not processed/denoised audio)
+      2. original_transcript.json — the ASR-generated transcript before annotation
+      3. annotated_transcript.srt — the final annotated transcript in SRT format
+
+    SRT timestamps use comma for milliseconds (HH:MM:SS,mmm).
+    Supports Hindi and Telugu Unicode characters via UTF-8 encoding.
+    Only allowed for COMPLETED audio with APPROVED annotation state.
+    Admin-only endpoint.
+    """
+    import io
+    import json
+    import zipfile
+    from pathlib import Path
+    from fastapi.responses import Response
+    from backend.database.models import AudioFile, Annotation
+    from backend.database.enums import AudioStatus, AnnotationState
+
+    role_val = current_user.role.value if hasattr(current_user.role, "value") else current_user.role
+    if role_val not in ("ADMIN", "SUPER_ADMIN"):
+        raise HTTPException(status_code=403, detail="Admin access required to export annotations")
+
+    audio = db.query(AudioFile).filter(AudioFile.id == audio_id).first()
+    if not audio:
+        raise HTTPException(status_code=404, detail="Audio file not found")
+
+    # Get latest annotation (ordered by updated_at descending)
+    annotation = (
+        db.query(Annotation)
+        .filter(Annotation.audio_id == audio_id)
+        .order_by(Annotation.updated_at.desc())
+        .first()
+    )
+
+    status_str = audio.status.value if hasattr(audio.status, "value") else str(audio.status)
+    state_str = (
+        annotation.state.value
+        if (annotation and hasattr(annotation.state, "value"))
+        else str(annotation.state if annotation else "")
+    )
+
+    is_approved = (status_str == "COMPLETED") and (state_str == "APPROVED")
+    if not is_approved:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Only fully approved annotations can be exported as SRT. "
+                f"Current state: audio={status_str}, annotation={state_str}"
+            )
+        )
+
+    if not annotation:
+        raise HTTPException(status_code=404, detail="No annotation found for this audio file")
+
+    # ── Parse final annotated transcript ──────────────────────────────────────
+    transcript_raw = annotation.transcript or "[]"
+    try:
+        segments = json.loads(transcript_raw)
+        if not isinstance(segments, list):
+            segments = []
+    except Exception:
+        segments = []
+
+    # ── Build SRT content (UTF-8) ─────────────────────────────────────────────
+    srt_content = _build_srt(segments)
+    srt_bytes = srt_content.encode("utf-8")
+
+    # ── Resolve original audio bytes ──────────────────────────────────────────
+    audio_bytes = b""
+    if audio.file_path and os.path.exists(audio.file_path):
+        with open(audio.file_path, "rb") as f:
+            audio_bytes = f.read()
+    elif audio.audio_url:
+        # For Supabase-hosted files, fetch via signed URL if possible
+        try:
+            from backend.core.config import settings
+            from supabase import create_client
+            supa = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
+            signed = supa.storage.from_(settings.STORAGE_BUCKET).create_signed_url(
+                audio.audio_url if not audio.audio_url.startswith("http") else audio.audio_url.split("/")[-1],
+                3600,
+            )
+            if signed and signed.get("signedURL"):
+                import urllib.request
+                with urllib.request.urlopen(signed["signedURL"]) as resp:
+                    audio_bytes = resp.read()
+        except Exception as e:
+            logger.warning(f"SRT export: could not fetch audio from Supabase for {audio_id}: {e}")
+
+    # ── Original transcript JSON (immutable) ──────────────────────────────────
+    original_transcript_bytes = (audio.original_transcript or "[]").encode("utf-8")
+
+    # ── Build ZIP ─────────────────────────────────────────────────────────────
+    # Use a safe stem for the zip filename
+    safe_stem = Path(audio.original_filename).stem if audio.original_filename else f"audio_{audio_id}"
+    # Remove characters unsafe for filenames
+    import re
+    safe_stem = re.sub(r'[^\w\-_.]', '_', safe_stem)
+
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        # 1. Original audio (canonical WAV — not processed/denoised)
+        zf.writestr("original_audio.wav", audio_bytes)
+
+        # 2. Original transcript JSON (ASR output — immutable, never overwritten)
+        zf.writestr("original_transcript.json", original_transcript_bytes)
+
+        # 3. Annotated transcript in SRT format
+        zf.writestr("annotated_transcript.srt", srt_bytes)
+
+    zip_buffer.seek(0)
+    zip_filename = f"export_{safe_stem}.zip"
+
+    return Response(
+        content=zip_buffer.getvalue(),
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename={zip_filename}"},
     )

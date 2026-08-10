@@ -27,7 +27,7 @@ load_dotenv(os.path.join(_ROOT, ".env"))
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from supabase import create_client, Client
-from database.models import AudioFile
+from backend.database.models import AudioFile
 
 # Configure Supabase
 SUPABASE_URL = os.environ.get("SUPABASE_URL")

@@ -1,7 +1,7 @@
 import pytest
-from services.annotation_service import save_annotation, submit_annotation
-from database.models import User, AudioFile, Annotation, AnnotationVersion, Dataset
-from database.enums import UserRole, AudioStatus, AnnotationState
+from backend.services.annotation_service import save_annotation, submit_annotation
+from backend.database.models import User, AudioFile, Annotation, AnnotationVersion, Dataset
+from backend.database.enums import UserRole, AudioStatus, AnnotationState
 
 def test_draft_saving(db):
     annotator = User(username="anno1", email="a@b.com", password_hash="hash", role=UserRole.ANNOTATOR)

@@ -8,15 +8,22 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast';
+import { Toaster, toast } from 'react-hot-toast';
 import { useEffect } from 'react';
 import { useAuthStore } from './store/auth';
 import DashboardLayout from './components/DashboardLayout';
+
+// Listen for maintenance mode events globally
+window.addEventListener('maintenance_mode', (e: any) => {
+  toast.error(e.detail || "Platform is currently undergoing maintenance", { id: 'maintenance_toast' });
+});
 import AdminDashboard from './pages/admin/AdminDashboard';
 import UsersManagement from './pages/admin/UsersManagement';
 import DatasetsManagement from './pages/admin/DatasetsManagement';
 import AdminSettings from './pages/admin/AdminSettings';
 import Leaderboard from './pages/admin/Leaderboard';
+import CurationPage from './pages/admin/CurationPage';
+import ExportsPage from './pages/admin/ExportsPage';
 import AnnotatorDashboard from './pages/annotator/AnnotatorDashboard';
 import TaskWorkspace from './pages/annotator/TaskWorkspace';
 import AnnotatorHistory from './pages/annotator/AnnotatorHistory';
@@ -204,11 +211,13 @@ export default function App() {
                 <DashboardLayout 
                   title="Admin Dashboard"
                   navItems={[
-                    { label: 'Overview', path: '/admin', icon: '📊' },
+                    { label: 'Overview',    path: '/admin',            icon: '📊' },
+                    { label: 'Curation',    path: '/admin/curation',   icon: '🎙️' },
+                    { label: 'Datasets',    path: '/admin/datasets',   icon: '📁' },
+                    { label: 'Exports',     path: '/admin/exports',    icon: '📦' },
+                    { label: 'Users',       path: '/admin/users',      icon: '👥' },
                     { label: 'Leaderboard', path: '/admin/leaderboard', icon: '🏆' },
-                    { label: 'Users', path: '/admin/users', icon: '👥' },
-                    { label: 'Datasets', path: '/admin/datasets', icon: '📁' },
-                    { label: 'Settings', path: '/admin/settings', icon: '⚙️' }
+                    { label: 'Settings',    path: '/admin/settings',   icon: '⚙️' }
                   ]}
                 />
               </ProtectedRoute>
@@ -219,6 +228,8 @@ export default function App() {
             <Route path="datasets" element={<DatasetsManagement />} />
             <Route path="settings" element={<AdminSettings />} />
             <Route path="leaderboard" element={<Leaderboard />} />
+            <Route path="curation" element={<CurationPage />} />
+            <Route path="exports" element={<ExportsPage />} />
           </Route>
 
           {/* Super Admin dashboard */}

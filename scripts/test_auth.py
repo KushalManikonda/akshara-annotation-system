@@ -1,6 +1,6 @@
-from database.database import SessionLocal
-from database.models import User
-from utils.security import verify_password
+from backend.database.database import SessionLocal
+from backend.database.models import User
+from backend.utils.security import verify_password
 
 db = SessionLocal()
 

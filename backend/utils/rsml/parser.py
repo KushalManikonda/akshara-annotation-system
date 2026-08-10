@@ -1,6 +1,6 @@
 import re
 
-from utils.rsml.ast import (
+from backend.utils.rsml.ast import (
     TextNode,
     IsolatedTagNode,
     SpanStartNode,
@@ -8,7 +8,7 @@ from utils.rsml.ast import (
     BracketNode,
 )
 
-from utils.rsml.constants import ISOLATED_TAGS
+from backend.utils.rsml.constants import ISOLATED_TAGS
 
 BRACKET_PATTERN = re.compile(
     r'([!#$]?)([A-Za-z\-]*)?\[([^\]]+)\]\(([^)]+)\)'

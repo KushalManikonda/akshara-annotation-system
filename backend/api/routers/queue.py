@@ -25,8 +25,8 @@ from sqlalchemy import text, func
 from sqlalchemy.orm import Session
 
 from backend.core.dependencies import get_current_user, get_db, require_role
-from database.models import AudioFile, Dataset, AuditLog, User
-from database.enums import AudioStatus, UserRole, AuditAction
+from backend.database.models import AudioFile, Dataset, AuditLog, User
+from backend.database.enums import AudioStatus, UserRole, AuditAction
 
 logger = logging.getLogger("akshara.queue")
 

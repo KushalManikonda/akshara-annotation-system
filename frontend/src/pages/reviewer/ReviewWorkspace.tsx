@@ -20,8 +20,6 @@ export default function ReviewWorkspace() {
   const [comments, setComments] = useState('');
   const waveformRef = useRef<WaveformPlayerRef>(null);
 
-  const audioUrl = token && id ? `${API_BASE_URL}/audio/${id}/stream?token=${token}` : (task?.audio_url || '');
-
   const { data: task, isLoading: isTaskLoading } = useQuery({
     queryKey: ['audio', id],
     queryFn: async () => {
@@ -30,6 +28,8 @@ export default function ReviewWorkspace() {
     },
     enabled: !!id,
   });
+
+  const audioUrl = token && id ? `${API_BASE_URL}/audio/${id}/stream?token=${token}` : (task?.audio_url || '');
 
   useEffect(() => {
     if (task?.reviewed_by_me) {
@@ -220,7 +220,7 @@ export default function ReviewWorkspace() {
              />
              <div style={{
                display: 'flex',
-               justify: 'space-between',
+               justifyContent: 'space-between',
                marginTop: '0.5rem',
                fontSize: '0.75rem',
                color: wordCount >= 10 ? '#34d399' : '#f59e0b'

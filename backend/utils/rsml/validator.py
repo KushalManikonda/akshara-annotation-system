@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from utils.rsml.ast import (
+from backend.utils.rsml.ast import (
     TextNode,
     IsolatedTagNode,
     SpanStartNode,
@@ -8,7 +8,7 @@ from utils.rsml.ast import (
     BracketNode,
 )
 
-from utils.rsml.constants import (
+from backend.utils.rsml.constants import (
     SPAN_TAGS,
     NER_TYPES,
     LANGUAGE_CODES,
@@ -189,16 +189,15 @@ class RSMLValidator:
 
     def validate_empty_transcript(self, ast):
 
-        has_text_or_tag = any(
-            (isinstance(node, TextNode) and node.text.strip()) or
-            isinstance(node, (IsolatedTagNode, SpanStartNode, SpanEndNode, BracketNode))
+        has_text = any(
+            isinstance(node, TextNode) and node.text.strip()
             for node in ast
         )
 
-        if not has_text_or_tag:
+        if not has_text:
             self.messages.append(
                 ValidationMessage(
                     "ERROR",
-                    "Transcript contains no text or tags."
+                    "Transcript contains no text."
                 )
             )

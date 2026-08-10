@@ -4,8 +4,8 @@ tests/backend/test_phase3_storage.py
 Phase 3 Storage regression tests.
 """
 import pytest
-from database.database import SessionLocal
-from database.models import AudioFile
+from backend.database.database import SessionLocal
+from backend.database.models import AudioFile
 import os
 
 def test_audio_url_column_exists():

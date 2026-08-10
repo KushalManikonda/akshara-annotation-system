@@ -1,10 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { audioApi } from '../../services/api';
-import { useNavigate } from 'react-router-dom';
 import { formatDurationHoursMins } from '../../utils/time';
 
 export default function ReviewerHistory() {
-  const navigate = useNavigate();
 
   const { data: allAudio, isLoading } = useQuery({
     queryKey: ['audio'],
@@ -60,7 +58,7 @@ export default function ReviewerHistory() {
                           {task.my_review_status === 'APPROVED' ? '✅ Approved' : '❌ Returned'}
                         </span>
                         {task.my_review_status === 'REJECTED' && task.last_reviewer_comment && (
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', italic: 'true' }}>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
                             "{task.last_reviewer_comment}"
                           </div>
                         )}

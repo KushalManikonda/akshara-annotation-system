@@ -16,7 +16,7 @@ from unittest.mock import patch
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from database.database import Base
+from backend.database.database import Base
 
 # Create a fresh in-memory DB for every test session
 engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
@@ -28,8 +28,8 @@ def setup_db():
     Base.metadata.create_all(bind=engine)
     db = TestingSession()
 
-    from database.models import User, Dataset, AudioFile, Annotation, AnnotationVersion, ReviewerApproval
-    from database.enums import UserRole, AudioStatus, AnnotationState, ApprovalStatus
+    from backend.database.models import User, Dataset, AudioFile, Annotation, AnnotationVersion, ReviewerApproval
+    from backend.database.enums import UserRole, AudioStatus, AnnotationState, ApprovalStatus
 
     # ── Users ────────────────────────────────────────────────────────────────
     admin = User(
@@ -122,7 +122,7 @@ def setup_db():
     db.close()
 
     # Patch the SessionLocal that analytics_service uses (must stay active for whole module)
-    import services.analytics_service as svc
+    import backend.services.analytics_service as svc
     orig = svc.SessionLocal
     svc.SessionLocal = TestingSession
     yield
@@ -131,7 +131,7 @@ def setup_db():
 
 
 # ── Import service ─────────────────────────────────────────────────────────────
-from services.analytics_service import (
+from backend.services.analytics_service import (
     get_kpi_summary,
     get_pipeline_funnel,
     get_annotation_trend,

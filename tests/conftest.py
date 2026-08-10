@@ -1,15 +1,13 @@
 import sys
 import os
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_STREAMLIT_APP = os.path.join(_ROOT, "streamlit_app")
-if _STREAMLIT_APP not in sys.path:
-    sys.path.insert(0, _STREAMLIT_APP)
+# No longer need sys.path hack for streamlit_app
 
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from database.models import Base
+from backend.database.models import Base
 
 # Create in-memory database
 engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
@@ -28,11 +26,11 @@ def setup_test_db(request, monkeypatch):
     Base.metadata.create_all(bind=engine)
     
     # Patch all services that use SessionLocal directly
-    monkeypatch.setattr("services.annotation_service.SessionLocal", TestingSessionLocal)
-    monkeypatch.setattr("services.reviewer_service.SessionLocal", TestingSessionLocal)
-    monkeypatch.setattr("services.auth_service.SessionLocal", TestingSessionLocal)
-    monkeypatch.setattr("services.audio_service.SessionLocal", TestingSessionLocal)
-    monkeypatch.setattr("services.assignment_service.SessionLocal", TestingSessionLocal)
+    monkeypatch.setattr("backend.services.annotation_service.SessionLocal", TestingSessionLocal)
+    monkeypatch.setattr("backend.services.reviewer_service.SessionLocal", TestingSessionLocal)
+    monkeypatch.setattr("backend.services.auth_service.SessionLocal", TestingSessionLocal)
+    monkeypatch.setattr("backend.services.audio_service.SessionLocal", TestingSessionLocal)
+    monkeypatch.setattr("backend.services.assignment_service.SessionLocal", TestingSessionLocal)
     
     yield
     

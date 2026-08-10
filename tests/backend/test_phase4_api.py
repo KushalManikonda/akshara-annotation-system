@@ -13,7 +13,7 @@ sys.path.insert(0, _ROOT)
 
 from backend.main import app
 from backend.core.dependencies import get_current_user
-from database.models import User
+from backend.database.models import User
 
 client = TestClient(app)
 
@@ -28,18 +28,18 @@ def mock_get_current_user():
 app.dependency_overrides[get_current_user] = mock_get_current_user
 
 def test_get_users():
-    response = client.get("/users/")
+    response = client.get("/api/users/")
     # If the database returns users, it will be 200.
     # Otherwise it might be 200 with [] depending on DB state.
     assert response.status_code == 200
     assert isinstance(response.json(), list)
 
 def test_get_datasets():
-    response = client.get("/datasets/")
+    response = client.get("/api/datasets/")
     assert response.status_code == 200
     assert isinstance(response.json(), list)
 
 def test_get_audio():
-    response = client.get("/audio/")
+    response = client.get("/api/audio/")
     assert response.status_code == 200
     assert isinstance(response.json(), list)

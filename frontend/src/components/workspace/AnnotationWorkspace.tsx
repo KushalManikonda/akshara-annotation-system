@@ -63,7 +63,7 @@ export function AnnotationWorkspace() {
         }
 
         // Normalize raw segments to match Segment type robustly
-        let mappedSegments = initialSegments.map((s, idx) => ({
+        let mappedSegments = initialSegments.map((s: any, idx) => ({
           id: (s.id ?? (idx + 1)).toString(),
           start: Number(s.start) || 0,
           end: Number(s.end) || 5,

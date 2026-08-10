@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { queueApi } from '../../services/api';
 import { useAuthStore } from '../../store/auth';
+import { formatDurationHoursMins } from '../../utils/time';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface TaskSummary {
@@ -41,12 +42,7 @@ const STATUS_META: Record<string, { label: string; color: string; bg: string; ic
   COMPLETED:       { label: 'Completed',       color: '#34d399', bg: 'rgba(52,211,153,0.1)',  icon: '✅' },
 };
 
-function formatDuration(seconds?: number) {
-  if (!seconds) return '—';
-  const m = Math.floor(seconds / 60);
-  const s = Math.round(seconds % 60);
-  return m > 0 ? `${m}m ${s}s` : `${s}s`;
-}
+// Replaced with formatDurationHoursMins
 
 // ── Task Card ─────────────────────────────────────────────────────────────────
 function TaskCard({ task, onContinue }: { task: TaskSummary; onContinue: (id: string) => void }) {
@@ -69,7 +65,7 @@ function TaskCard({ task, onContinue }: { task: TaskSummary; onContinue: (id: st
         </div>
         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', gap: '1rem' }}>
           <span>🌐 {task.language}</span>
-          <span>⏱️ {formatDuration(task.duration)}</span>
+          <span>⏱️ {formatDurationHoursMins(task.duration)}</span>
           <span style={{ color: meta.color }}>
             {meta.icon} {meta.label}
           </span>

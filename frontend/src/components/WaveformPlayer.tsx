@@ -23,6 +23,7 @@ export interface WaveformPlayerProps {
 export interface WaveformPlayerRef {
   play: () => void;
   pause: () => void;
+  playPause: () => void;
   playRegion: (id: string) => void;
   seekTo: (time: number) => void;
   skip: (seconds: number) => void;

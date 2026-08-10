@@ -65,6 +65,8 @@ class Settings(BaseSettings):
 
     # ── Storage ───────────────────────────────────────────────────
     STORAGE_BUCKET: str = "audio-files"
+    # Local fallback path for audio uploads
+    BASE_AUDIO_PATH: str = "assets/audio"
     # Signed URL expiry for audio playback (seconds)
     AUDIO_URL_EXPIRY_SECONDS: int = 3600
 
@@ -87,6 +89,16 @@ class Settings(BaseSettings):
     # ── Task Locking ──────────────────────────────────────────────
     TASK_LOCK_TIMEOUT_MINUTES: int = 30
     TASK_LOCK_HEARTBEAT_INTERVAL_SECONDS: int = 60
+
+    # ── Pipeline Configuration ─────────────────────────────────────────────────
+    # Hugging Face token — required for Pyannote (Hindi pipeline)
+    HF_TOKEN: str = ""
+    # Whisper model path or HF model ID (English pipeline)
+    WHISPER_MODEL_PATH: str = "openai/whisper-base"
+    # AI4Bharat IndicConformer model ID (Hindi + Telugu pipelines)
+    INDIC_CONFORMER_MODEL: str = "ai4bharat/indic-conformer-600m-multilingual"
+    # Temporary directory for pipeline intermediate files (separated vocals, etc.)
+    PIPELINE_TEMP_DIR: str = "/tmp/akshara_pipeline"
 
     model_config = SettingsConfigDict(
         env_file=str(_ENV_PATH),

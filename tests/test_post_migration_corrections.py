@@ -6,9 +6,9 @@ import pytest
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "streamlit_app")))
 
-from services.analytics_service import get_annotator_leaderboard, get_reviewer_leaderboard
-from services.reviewer_service import validate_review_comment
-from services.audio_service import _extract_id_from_path
+from backend.services.analytics_service import get_annotator_leaderboard, get_reviewer_leaderboard
+from backend.services.reviewer_service import validate_review_comment
+from backend.services.audio_service import _extract_id_from_path
 from pathlib import Path
 
 

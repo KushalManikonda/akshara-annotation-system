@@ -24,8 +24,8 @@ from backend.core.security import (
     hash_token,
     verify_password,
 )
-from services.user_service import get_user_by_username
-from database.models import SessionToken
+from backend.services.user_service import get_user_by_username
+from backend.database.models import SessionToken
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 

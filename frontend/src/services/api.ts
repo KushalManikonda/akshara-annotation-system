@@ -58,20 +58,29 @@ api.interceptors.response.use(
         useAuthStore.getState().setToken(newToken);
 
         // Flush pending requests
+        _isRefreshing = false;
         _pendingRequests.forEach((cb) => cb(newToken));
         _pendingRequests = [];
 
-        // Retry the original request
+        // Retry original request
         originalRequest.headers.Authorization = `Bearer ${newToken}`;
         return api(originalRequest);
-      } catch {
-        // Refresh also failed — full logout
-        _pendingRequests = [];
-        useAuthStore.getState().logout();
-        return Promise.reject(error);
-      } finally {
+      } catch (refreshError) {
         _isRefreshing = false;
+        _pendingRequests = [];
+        
+        // Refresh token is invalid/expired — force logout
+        useAuthStore.getState().logout();
+        return Promise.reject(refreshError);
       }
+    }
+
+    // Handle 503 Maintenance Mode
+    if (error.response?.status === 503) {
+      const detail = error.response.data?.detail || "Platform is currently undergoing maintenance";
+      // We can use a custom event or store flag, but a simple window alert or toast works.
+      // We will avoid importing toast here to prevent circular deps if any, but since we can't easily toast from api.ts without importing it, we can dispatch a custom event.
+      window.dispatchEvent(new CustomEvent('maintenance_mode', { detail }));
     }
 
     return Promise.reject(error);
@@ -262,3 +271,36 @@ export const queueApi = {
     return res.data;
   },
 };
+
+// ── Curation API ──────────────────────────────────────────────────────────────
+
+export const curationApi = {
+  /** Upload an original audio file and register it for pipeline processing. */
+  upload: async (formData: FormData) => {
+    const { data } = await api.post('/curation/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return data;
+  },
+  /** Launch the background ASR pipeline for a given audio file. */
+  runPipeline: async (audioId: string) => {
+    const { data } = await api.post(`/curation/${audioId}/run`);
+    return data;
+  },
+  /** Poll pipeline processing status. */
+  getStatus: async (audioId: string) => {
+    const { data } = await api.get(`/curation/${audioId}/status`);
+    return data;
+  },
+  /** Submit the completed transcript into the existing annotation workflow. */
+  submitToQueue: async (audioId: string) => {
+    const { data } = await api.post(`/curation/${audioId}/submit`);
+    return data;
+  },
+  /** List all audio files ingested via the curation pipeline. */
+  listItems: async () => {
+    const { data } = await api.get('/curation/');
+    return data;
+  },
+};
+

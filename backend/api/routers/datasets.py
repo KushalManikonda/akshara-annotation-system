@@ -2,10 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from typing import List, Optional
 from backend.core.dependencies import get_current_user
 from backend.schemas.dataset import DatasetResponse
-from database.models import User
-from database.database import SessionLocal
-from database.models import Dataset, AudioFile, User
-from services.audio_service import get_all_datasets, delete_dataset, upload_audio, import_metadata_for_dataset, _extract_id_from_path
+from backend.database.models import User
+from backend.database.database import SessionLocal
+from backend.database.models import Dataset, AudioFile, User
+from backend.services.audio_service import get_all_datasets, delete_dataset, upload_audio, import_metadata_for_dataset, _extract_id_from_path
 from pathlib import Path
 
 router = APIRouter(prefix="/datasets", tags=["datasets"])

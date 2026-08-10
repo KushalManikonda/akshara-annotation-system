@@ -9,8 +9,7 @@ export function formatDurationHoursMins(seconds: number | undefined | null): str
   const totalMins = Math.floor(seconds / 60);
   const hrs = Math.floor(totalMins / 60);
   const mins = totalMins % 60;
-  const hrsStr = hrs === 1 ? '1 hr' : `${hrs} hrs`;
-  return `${hrsStr}, ${mins} mins`;
+  return `${hrs} hrs, ${mins} mins`;
 }
 
 /**

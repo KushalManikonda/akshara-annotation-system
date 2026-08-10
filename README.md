@@ -1,247 +1,374 @@
-# Akshara RSML Studio
+# Akshara Annotation Platform
 
-> **Live Application**: [https://akshara-annotation-platform.streamlit.app/](https://akshara-annotation-platform.streamlit.app/)
-
-Akshara RSML Studio is a professional audio annotation platform designed for **Rich Speech Markup Language (RSML)**. Built with Streamlit and a custom WaveSurfer.js v7 component, it provides an end-to-end workflow for annotators, reviewers, and administrators to collaboratively transcribe and review spoken audio with precision.
+A full-stack, multi-role audio annotation platform for Hindi, English, and Telugu speech data. Annotators transcribe audio segments, reviewers approve or request corrections, and administrators manage users, datasets, pipelines, and exports through either a React or Streamlit frontend backed by a shared FastAPI + Supabase PostgreSQL backend.
 
 ---
 
-## Table of Contents
+## Architecture
 
-- [Live Demo](#live-demo)
-- [Features Overview](#features-overview)
-- [Setup from Scratch](#setup-from-scratch)
-- [Directory Structure](#directory-structure)
-- [Role-Based Functionality](#role-based-functionality)
-  - [Annotator](#annotator)
-  - [Reviewer](#reviewer)
-  - [Admin](#admin)
-- [Keyboard Shortcuts](#keyboard-shortcuts)
-- [Technical Architecture](#technical-architecture)
-
----
-
-## Live Demo
-
-Access the live deployment directly — no installation required:
-
-🔗 **[https://akshara-annotation-platform.streamlit.app/](https://akshara-annotation-platform.streamlit.app/)**
-
----
-
-## Features Overview
-
-- **Interactive Audio Waveform** powered by WaveSurfer.js v7 with zoom, speed control, and visual region highlights
-- **Draggable & Resizable Regions** — adjust segment boundaries directly on the waveform
-- **Bi-directional Sync** — clicking a segment card seeks audio; clicking a region highlights the card
-- **RSML Tag Autocomplete** — type `@` in any transcript field for instant tag suggestions
-- **Live Normalized Preview** — side-by-side view of raw RSML input and the cleaned normalized output
-- **Segment Completion Tracking** — mark segments as Done; completed segments lock the transcript to prevent accidental edits
-- **Undo / Redo / Revert** — full history support for all region and transcript changes
-- **Role-based Workflows** — Annotator → Reviewer → Admin pipeline with feedback loops
-
----
-
-## Setup from Scratch (React + FastAPI)
-
-Since we are actively migrating the platform to a modern React + FastAPI architecture, the process for running the application has changed from the original Streamlit instructions.
-
-To run the new application, you will need to start both the backend server and the frontend server in two separate terminal windows.
-
-### Prerequisites
-
-- **Python 3.10+**
-- **Node.js 18+**
-- A terminal (PowerShell on Windows, Terminal on macOS/Linux)
-
-### 1. Start the Backend (FastAPI)
-Open a terminal in the root directory (`Akshara-Annotation-Platform-main`) and start the backend using Uvicorn. Since we are using Supabase for the database, you'll need to pass the `DATABASE_URL` environment variable:
-
-**On Windows (PowerShell):**
-```powershell
-python -m venv venv
-venv\Scripts\activate
-pip install -r requirements.txt
-
-$env:DATABASE_URL="postgresql://postgres:M1voma!23db@db.dqwhdmmmtpienottmlwi.supabase.co:5432/postgres"
-python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
+```
+React Frontend (Vite)          Streamlit Frontend
+        |                              |
+        +-----------------------------+
+                       |
+              FastAPI Backend (Python)
+                       |
+              Supabase PostgreSQL
+                       |
+              Supabase Storage (audio files)
 ```
 
-**On macOS / Linux:**
+ASR / Curation Pipelines run server-side inside the FastAPI backend:
+
+| Language | Pipeline |
+|----------|----------|
+| Hindi    | AI4Bharat IndicConformer + Pyannote diarization (HF_TOKEN) |
+| English  | OpenAI Whisper |
+| Telugu   | AI4Bharat IndicConformer |
+
+> SQLite is NOT supported. The backend raises a startup error if DATABASE_URL is missing or points to SQLite.
+
+---
+
+## Repository Structure
+
+```
+akshara-annotation-system/
++-- backend/                    # FastAPI application
+|   +-- api/routers/            # Endpoint routers (auth, users, audio, annotations, curation...)
+|   +-- core/
+|   |   +-- config.py           # Settings loaded from environment / .env
+|   |   +-- dependencies.py     # FastAPI dependency injection (auth, db, roles)
+|   +-- database/
+|   |   +-- database.py         # SQLAlchemy engine + session factory (PostgreSQL only)
+|   |   +-- models.py           # ORM models
+|   |   +-- enums.py            # UserRole, TaskStatus, etc.
+|   +-- pipelines/              # ASR pipeline runners
+|   |   +-- hindi_pipeline.py
+|   |   +-- english_pipeline.py
+|   |   +-- telugu_pipeline.py
+|   |   +-- pipeline_runner.py
+|   +-- schemas/                # Pydantic request/response schemas
+|   +-- services/               # Business-logic layer
+|   +-- utils/                  # Audio utilities, RSML parser/formatter
+|   +-- main.py                 # FastAPI application entry point
+|
++-- frontend/                   # React 19 + Vite application
+|   +-- src/
+|   |   +-- pages/              # Route-level pages (admin, annotator, reviewer)
+|   |   +-- components/         # Reusable UI components
+|   |   +-- services/api.ts     # Axios instance + token-refresh interceptor
+|   |   +-- App.tsx             # Router + global error/maintenance handling
+|   +-- package.json
+|   +-- vite.config.ts
+|
++-- streamlit/                  # Streamlit frontend (shares backend/DB with React)
+|   +-- app.py                  # Entry point
+|   +-- views/
+|   |   +-- admin.py
+|   |   +-- annotator.py
+|   |   +-- reviewer.py
+|   +-- components/             # Custom Streamlit components (WaveSurfer player)
+|   +-- requirements.txt
+|
++-- scripts/                    # Utility scripts (create admin, migrate data...)
++-- migrations/                 # Database migration scripts
++-- tests/                      # Backend test suite (pytest)
++-- docs/                       # Additional documentation
++-- .env.example                # Environment variable template - copy to .env
++-- .gitignore
++-- README.md
+```
+
+---
+
+## Prerequisites
+
+| Requirement | Notes |
+|-------------|-------|
+| Python 3.10+ | Backend + Streamlit |
+| Node.js 18+ | React frontend |
+| npm | Bundled with Node.js |
+| Supabase account | Provides PostgreSQL + Storage (free tier sufficient) |
+| FFmpeg | Required by ASR pipelines (must be on PATH) |
+| GPU / CUDA | Recommended for Hindi and Telugu pipelines (CPU works but is slow) |
+| Hugging Face token | Required for Hindi pipeline (Pyannote diarization). Must accept the Pyannote model licence on HuggingFace. |
+
+---
+
+## Clone
+
 ```bash
-python3 -m venv venv
-source venv/bin/activate
+git clone https://github.com/KushalManikonda/akshara-annotation-system.git
+cd akshara-annotation-system
+```
+
+---
+
+## Environment Configuration
+
+```bash
+# Linux / macOS
+cp .env.example .env
+
+# Windows (PowerShell)
+Copy-Item .env.example .env
+```
+
+Open `.env` and fill in every variable:
+
+| Variable | Description |
+|----------|-------------|
+| `DATABASE_URL` | Supabase PostgreSQL connection string |
+| `JWT_SECRET_KEY` | Random string >= 32 chars. Generate with: `python -c "import secrets; print(secrets.token_hex(32))"` |
+| `CORS_ORIGINS` | Comma-separated allowed origins (include your React dev URL) |
+| `SUPABASE_URL` | Your Supabase project URL |
+| `SUPABASE_ANON_KEY` | Public anon key (safe for client-side) |
+| `SUPABASE_SERVICE_KEY` | Service-role secret - NEVER expose to frontend |
+| `STORAGE_BUCKET` | Supabase Storage bucket name (default: `audio-files`) |
+| `HF_TOKEN` | Hugging Face token - required for Hindi pipeline only |
+| `WHISPER_MODEL_PATH` | HF model ID or local path (default: `openai/whisper-base`) |
+| `INDIC_CONFORMER_MODEL` | HF model ID (default: `ai4bharat/indic-conformer-600m-multilingual`) |
+| `PIPELINE_TEMP_DIR` | Writable temp directory for intermediate pipeline files |
+
+> NEVER commit your real `.env`. It is already in `.gitignore`. Only `.env.example` (empty values) is committed.
+
+---
+
+## Supabase PostgreSQL Setup
+
+This project is PostgreSQL / Supabase only. SQLite is explicitly rejected at startup.
+
+1. Create a Supabase project at https://supabase.com
+2. Go to **Settings > Database > Connection string > URI** and copy the full PostgreSQL URI.
+   Format: `postgresql://postgres:<password>@db.<ref>.supabase.co:5432/postgres`
+3. Set `DATABASE_URL` in your `.env` to that URI.
+4. Set `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_KEY` from **Settings > API**.
+5. Create a Storage bucket named `audio-files` (or the name you set in `STORAGE_BUCKET`).
+6. The backend automatically creates all required tables (via SQLAlchemy `create_all`) on first startup.
+
+---
+
+## Backend Setup
+
+```bash
+# Create and activate a virtual environment
+python -m venv .venv
+
+# Windows
+.venv\Scripts\activate
+
+# macOS / Linux
+source .venv/bin/activate
+
+# Install dependencies
 pip install -r requirements.txt
 
-export DATABASE_URL="postgresql://postgres:M1voma!23db@db.dqwhdmmmtpienottmlwi.supabase.co:5432/postgres"
+# Start the backend (loads .env automatically via python-dotenv)
 uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
 ```
-*(Note: The backend runs on `http://127.0.0.1:8000`)*
 
-### 2. Start the Frontend (React + Vite)
-Open a **second** terminal, navigate to the `frontend` folder, and start the Vite development server:
+- API: http://127.0.0.1:8000
+- Interactive docs: http://127.0.0.1:8000/api/docs
 
-```powershell
+---
+
+## React Frontend Setup
+
+```bash
 cd frontend
-npm install   # Run this once if you haven't already installed dependencies
+npm install
 npm run dev
 ```
 
-*(Note: The frontend will be available at `http://localhost:5173`)*
+The React app runs at http://localhost:5173 and proxies `/api/*` requests to the backend on port 8000 (configured in `vite.config.ts`).
 
-Once both are running, open `http://localhost:5173` in your browser. The frontend will automatically route API requests to your local backend on port 8000.
+For production builds, set `VITE_API_BASE_URL` in `frontend/.env.local` to your deployed backend URL.
 
 ---
 
-## Directory Structure
+## Streamlit Setup
 
-```
-Akshara-Annotation-Platform/
-├── app.py                          # Main Streamlit entry point
-├── requirements.txt                # Python dependencies
-│
-├── views/                          # Page-level UI views
-│   ├── annotator.py                # Annotator dashboard
-│   ├── reviewer.py                 # Reviewer dashboard
-│   └── admin.py                   # Admin dashboard
-│
-├── components/                     # Custom UI components
-│   └── annotator/
-│       ├── wavesurfer_editor.py    # Streamlit component wrapper
-│       └── wavesurfer_custom/
-│           └── index.html          # Core HTML/JS WaveSurfer player
-│
-├── database/                       # Database models & setup
-│   ├── models.py                   # SQLAlchemy ORM models
-│   └── db.py                      # Database session & engine
-│
-├── services/                       # Business logic layer
-│   ├── task_service.py             # Task assignment & status management
-│   └── annotation_service.py      # Annotation CRUD operations
-│
-└── scripts/                        # Utility scripts
-    ├── setup_db.py                 # Database initialization & seeding
-    └── generate_sample_data.py     # Creates sample audio tasks
+Streamlit uses the same FastAPI backend and Supabase database as React.
+
+```bash
+# Activate your Python virtual environment first
+pip install -r streamlit/requirements.txt
+
+streamlit run streamlit/app.py
 ```
 
----
-
-## Role-Based Functionality
-
-### Annotator
-
-Annotators are responsible for transcribing audio segments into RSML format.
-
-**Dashboard**
-- View the personal task queue showing assigned audio files
-- See task status: Pending, In Progress, Submitted, Approved, or Needs Revision
-- Click **Back to Queue** at any time to return to the task list without losing progress
-
-**Audio Player**
-- Full waveform visualization with zoom and playback speed control
-- Click anywhere on the waveform to seek to that position
-- Use the scrollbar below the waveform to navigate long audio files
-- Double-click a region on the waveform to play only that segment (auto-stops at the end)
-
-**Segment Management**
-- Each audio segment appears as a colored region on the waveform and as a card on the right panel
-- **Drag** a region to move it; **resize the edges** to adjust start/end times
-- **Split Segment** (✂ icon): places the playback cursor inside a segment, then click cut to split it at that exact point
-- **Delete Segment** (🗑 icon): removes the segment from both waveform and transcript panel
-- **Add Segment** button: adds a new 2-second segment starting at the current playback position
-- Timestamp inputs (start/end) in each card are directly editable
-
-**Transcript Editing**
-- Each segment card has an **Editable ASR Transcript** field on the left and a live **Normalized Preview** on the right
-- Type `@` to trigger autocomplete for RSML tags (e.g., `@breathe`, `@laughter`, `@umm`)
-- The normalized preview updates live as you type
-- **Done Checkbox**: tick this when you finish a segment. This locks the transcript to prevent accidental edits. Untick to unlock and edit again.
-- Locked (completed) segments are highlighted with a green left border
-
-**History Controls**
-- **Ctrl+Z**: Undo the last change (region move, edit, split, delete, add)
-- **Ctrl+Y**: Redo the last undone change
-- **Revert** button: instantly resets all segments back to the original state when the task was first loaded
-
-**Saving**
-- **Save Changes** button: manually saves all current segment data to the backend
-- Changes are also auto-saved whenever you check/uncheck the Done checkbox or edit timestamps
-- When finished with all segments, click **Submit** to send the task to reviewers
+Streamlit is available at http://localhost:8501
 
 ---
 
-### Reviewer
+## Running the Full System
 
-Reviewers inspect submitted annotations and either approve them or send them back with feedback.
+Open three terminals from the project root:
 
-**Dashboard**
-- View a queue of tasks submitted by annotators awaiting review
-- Filter tasks by status, speaker, or submission date
+**Terminal 1 - Backend**
+```bash
+.venv\Scripts\activate          # Windows
+# source .venv/bin/activate     # macOS/Linux
+uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
+```
 
-**Review Interface**
-- Opens the same audio player with the annotator's completed transcript loaded
-- Navigate through each segment, listening to the audio and comparing it with the transcript
-- Segments are read-only in review mode to prevent accidental changes
+**Terminal 2 - React Frontend**
+```bash
+cd frontend && npm run dev
+```
 
-**Actions**
-- **Approve**: marks the task as complete and moves it to the approved pool
-- **Reject / Request Revision**: sends the task back to the annotator with a written comment explaining what needs to be fixed
-- The annotator receives the feedback in their queue and can re-edit and re-submit
+**Terminal 3 - Streamlit (optional)**
+```bash
+streamlit run streamlit/app.py
+```
 
----
-
-### Admin
-
-Admins have full control over the platform and all users' work.
-
-**User Management**
-- Create, edit, and deactivate user accounts
-- Assign roles: Annotator, Reviewer, or Admin
-- Reset passwords
-
-**Task Management**
-- Upload new audio files and create annotation tasks
-- Assign tasks to specific annotators or leave them in a shared pool
-- Monitor task progress across all users in real time
-
-**Dashboard & Analytics**
-- View platform-wide statistics: total tasks, completion rate, tasks pending review
-- Identify bottlenecks (e.g., tasks stuck in a particular status for too long)
-- Export annotation data in JSON or CSV format for downstream processing
-
-**Quality Control**
-- Override any reviewer decision
-- Reassign tasks between annotators or reviewers
-- View the full edit history of any task
+| Service | URL |
+|---------|-----|
+| React UI | http://localhost:5173 |
+| Streamlit UI | http://localhost:8501 |
+| FastAPI | http://127.0.0.1:8000 |
+| API Docs | http://127.0.0.1:8000/api/docs |
 
 ---
 
-## Keyboard Shortcuts
+## Roles
 
-These shortcuts work anywhere in the annotator view when focus is not inside a text field:
-
-| Shortcut | Action |
-|----------|--------|
-| `Space` | Play / Pause audio |
-| `←` | Rewind 10 seconds |
-| `→` | Forward 10 seconds |
-| `Shift + ←` | Go to Previous Task |
-| `Shift + →` | Go to Next Task |
-| `Ctrl + Z` | Undo last action |
-| `Ctrl + Y` | Redo last undone action |
-| `Ctrl + D` | Duplicate active segment |
+| Role | Responsibilities |
+|------|----------------|
+| **Admin** | Manages users, uploads datasets, monitors progress, runs ASR curation pipelines, exports finalized annotations, controls system settings (Maintenance Mode). |
+| **Annotator** | Receives assigned audio tasks, edits the ASR-generated transcript using RSML tags, and submits for review. |
+| **Reviewer** | Inspects submitted annotations, approves them or sends them back with written feedback. |
 
 ---
 
-## Technical Architecture
+## Core Workflow
 
-| Layer | Technology |
-|-------|------------|
-| Frontend UI | Streamlit (Python) |
-| Audio Player | WaveSurfer.js v7 + Regions Plugin |
-| Tag Autocomplete | Tribute.js |
-| Component Bridge | Streamlit Custom Component API (`postMessage`) |
-| Database | SQLite via SQLAlchemy ORM |
-| Deployment | Streamlit Community Cloud |
+```
+Admin uploads audio file
+        |
+Language selected (Hindi / English / Telugu)
+        |
+ASR curation pipeline runs (IndicConformer / Whisper)
+        |
+Transcript JSON stored in PostgreSQL
+        |
+Task assigned to Annotator
+        |
+Annotator edits transcript in waveform editor -> submits
+        |
+Reviewer inspects -> approves or requests revision
+        |
+On approval: audio status -> COMPLETED
+        |
+Admin exports: original audio + transcript JSON + annotated SRT
+```
 
-The audio player is a fully self-contained HTML/JS component embedded inside Streamlit via an `<iframe>`. It communicates bidirectionally with the Python backend using `window.parent.postMessage` (component → Streamlit) and the `streamlit:render` message event (Streamlit → component). The audio file itself is **never modified** — only the region metadata (start time, end time, speaker, transcript) is read and written.
+---
+
+## ASR Curation Pipelines
+
+Invoked from the **Curation** section of the Admin dashboard.
+
+### Hindi Pipeline
+- ASR: AI4Bharat `indic-conformer-600m-multilingual`
+- Diarization: Pyannote (requires `HF_TOKEN` + model licence accepted on HuggingFace)
+- Source separation: Demucs (vocals extraction before ASR)
+
+### English Pipeline
+- ASR: OpenAI Whisper (`openai/whisper-base` or configured model)
+- No separate diarization step
+
+### Telugu Pipeline
+- ASR: AI4Bharat `indic-conformer-600m-multilingual`
+- No separate diarization step
+
+---
+
+## Exports
+
+Once an annotation is approved, admins can export from the **Exports** section.
+
+Each export ZIP contains:
+- `original_audio.<ext>` - the original uploaded audio (from Supabase Storage)
+- `original_transcript.json` - the raw ASR transcript JSON
+- `annotated_transcript.srt` - the final annotated transcript in SRT subtitle format
+
+---
+
+## Development Guidelines
+
+- Never commit secrets. `.env` is in `.gitignore`. Use `.env.example` for documentation.
+- Never hardcode machine-specific paths. Use `pathlib.Path`, `os.environ`, and the `settings` object.
+- Never introduce SQLite. The backend explicitly rejects it at startup.
+- Preserve role/auth behaviour. Changes to `dependencies.py` affect all protected routes.
+- Keep React and Streamlit aligned. If you change shared backend API behaviour, update both frontends.
+- Do not commit generated files. ZIPs, `.pyc`, `node_modules`, `dist/`, model caches, and audio uploads are all gitignored.
+
+---
+
+## Deployment (Render)
+
+This project targets [Render](https://render.com) for deployment.
+
+### Recommended Render Architecture
+
+| Render Service | Type | Content |
+|---------------|------|---------|
+| `akshara-api` | Web Service | FastAPI backend |
+| `akshara-frontend` | Static Site | React build |
+| `akshara-streamlit` | Web Service (optional) | Streamlit |
+| Supabase | External | PostgreSQL + Storage |
+
+### FastAPI Web Service
+- Build: `pip install -r requirements.txt`
+- Start: `uvicorn backend.main:app --host 0.0.0.0 --port $PORT`
+
+### React Static Site
+- Build: `cd frontend && npm install && npm run build`
+- Publish directory: `frontend/dist`
+- Set `VITE_API_BASE_URL` env var to your FastAPI Render URL.
+
+### Streamlit Web Service
+- Build: `pip install -r streamlit/requirements.txt`
+- Start: `streamlit run streamlit/app.py --server.port $PORT --server.address 0.0.0.0`
+
+### Environment Variables on Render
+Set `DATABASE_URL`, `JWT_SECRET_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_KEY`, `CORS_ORIGINS`, `HF_TOKEN`, and all other variables in each Render service's **Environment** tab. Never paste real credentials into source files.
+
+> Pipeline note: Hindi and Telugu pipelines download large models (~1-2 GB). A paid Render instance with at least 2 GB RAM is recommended.
+
+---
+
+## Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---------|-------------|-----|
+| `CRITICAL: DATABASE_URL is not set` | `.env` missing | Copy `.env.example` to `.env` and fill in `DATABASE_URL` |
+| `CRITICAL: SQLite is no longer supported` | Wrong connection string | Use Supabase PostgreSQL URI |
+| Supabase connection refused | Wrong credentials | Verify `DATABASE_URL` in Supabase dashboard |
+| React "Failed to fetch" | Backend not running | Start uvicorn on port 8000 |
+| CORS error in browser | Origin not in `CORS_ORIGINS` | Add your frontend URL to `CORS_ORIGINS` |
+| Hindi pipeline fails | `HF_TOKEN` missing or licence not accepted | Set `HF_TOKEN`; accept Pyannote licence at huggingface.co |
+| `ffmpeg not found` | FFmpeg not installed | Install FFmpeg and add to PATH |
+| `npm install` fails | Node.js version too old | Upgrade to Node.js 18+ |
+| `pip install` fails | Python version too old | Use Python 3.10+ |
+
+---
+
+## Contributing
+
+1. Fork this repository on GitHub.
+2. Clone your fork: `git clone https://github.com/<your-username>/akshara-annotation-system.git`
+3. Create a branch: `git checkout -b feature/your-feature-name`
+4. Make changes following the Development Guidelines.
+5. Test with `pytest tests/` and verify both React and Streamlit UIs.
+6. Commit: `git commit -m "feat: describe your change"`
+7. Push: `git push origin feature/your-feature-name`
+8. Open a Pull Request against the `main` branch.
+
+---
+
+## License
+
+MIT - see [LICENSE](LICENSE).

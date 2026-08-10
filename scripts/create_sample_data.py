@@ -2,9 +2,9 @@ import wave
 import struct
 import math
 import os
-from database.database import SessionLocal
-from database.models import User, Dataset, AudioFile, Annotation
-from database.enums import UserRole, AudioStatus
+from backend.database.database import SessionLocal
+from backend.database.models import User, Dataset, AudioFile, Annotation
+from backend.database.enums import UserRole, AudioStatus
 import uuid
 
 def generate_sample_audio(filename, duration_sec=30, sample_rate=44100, freq=440.0):

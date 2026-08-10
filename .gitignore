@@ -38,6 +38,7 @@ venv.bak/
 *.sqlite3
 *.db
 streamlit_app/akshara.db
+streamlit/akshara.db
 akshara.db
 
 # ── Node / Frontend ───────────────────────────────────────────────────────────

@@ -13,10 +13,10 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from database.database import SessionLocal
-from database.models import AudioFile
-from database.enums import AudioStatus
-from utils.logger import logger
+from backend.database.database import SessionLocal
+from backend.database.models import AudioFile
+from backend.database.enums import AudioStatus
+from backend.utils.logger import logger
 
 
 def get_db() -> Session:
@@ -135,7 +135,7 @@ def release_task(audio_id: str, annotator_id: str) -> bool:
             return False
 
         # Delete associated annotation to clear the slate
-        from database.models import Annotation
+        from backend.database.models import Annotation
         db.query(Annotation).filter(
             Annotation.audio_id == audio_id,
             Annotation.annotator_id == annotator_id

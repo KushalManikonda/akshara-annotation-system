@@ -1,8 +1,8 @@
 import os
 import json
-from database.database import SessionLocal
-from database.models import User, Dataset, AudioFile, Annotation
-from database.enums import UserRole, AudioStatus
+from backend.database.database import SessionLocal
+from backend.database.models import User, Dataset, AudioFile, Annotation
+from backend.database.enums import UserRole, AudioStatus
 import uuid
 
 def seed_voice_data():

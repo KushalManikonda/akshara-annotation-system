@@ -1,8 +1,8 @@
-from database.database import SessionLocal
-from database.models import User
-from database.enums import UserRole
-from utils.security import hash_password
-from utils.logger import logger
+from backend.database.database import SessionLocal
+from backend.database.models import User
+from backend.database.enums import UserRole
+from backend.utils.security import hash_password
+from backend.utils.logger import logger
 
 db = SessionLocal()
 

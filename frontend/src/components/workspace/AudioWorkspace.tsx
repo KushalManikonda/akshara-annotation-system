@@ -173,7 +173,7 @@ export function AudioWorkspace({
               {shortcutsList.map((item, idx) => (
                 <div key={idx} style={{
                   display: 'flex',
-                  justify: 'space-between',
+                  justifyContent: 'space-between',
                   alignItems: 'center',
                   padding: '0.625rem 0.875rem',
                   background: 'rgba(255, 255, 255, 0.04)',

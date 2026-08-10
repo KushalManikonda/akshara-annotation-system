@@ -11,12 +11,8 @@ import os
 from datetime import datetime, timedelta
 
 # ── Path setup ────────────────────────────────────────────────────────────────
-# NOTE: sys.path injection for streamlit_app/ is handled by backend/core/dependencies.py
-# which imports database.database, database.models, database.enums from that location.
+# Services and Database are now correctly located in the backend/ package.
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_STREAMLIT_APP = os.path.join(_PROJECT_ROOT, "streamlit_app")
-if _STREAMLIT_APP not in sys.path:
-    sys.path.insert(0, _STREAMLIT_APP)
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -38,6 +34,7 @@ from backend.api.routers.annotations import router as annotations_router
 from backend.api.routers.auth import router as auth_router
 from backend.api.routers.analytics import router as analytics_router
 from backend.api.routers.queue import router as queue_router
+from backend.api.routers.curation import router as curation_router
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -74,6 +71,10 @@ app.include_router(datasets_router, prefix="/api")
 app.include_router(annotations_router, prefix="/api")
 app.include_router(analytics_router, prefix="/api")
 app.include_router(queue_router, prefix="/api")
+app.include_router(curation_router, prefix="/api")
+
+from backend.api.routers.settings import router as settings_router
+app.include_router(settings_router, prefix="/api")
 
 # NOTE: Local static asset serving removed.
 # All audio files are served from Supabase Storage via signed/public URLs.
@@ -95,9 +96,9 @@ async def _release_abandoned_tasks():
       - Status is IN_PROGRESS and last_heartbeat_at > 45 min ago (tab closed / lost connection)
     Drafts are preserved — only task assignment status is rolled back.
     """
-    from database.database import SessionLocal
-    from database.models import AudioFile, AuditLog
-    from database.enums import AudioStatus, AuditAction
+    from backend.database.database import SessionLocal
+    from backend.database.models import AudioFile, AuditLog
+    from backend.database.enums import AudioStatus, AuditAction
 
     while True:
         await asyncio.sleep(CLEANUP_INTERVAL_SECONDS)
@@ -186,7 +187,7 @@ async def startup():
         logger.warning(f"Database backend: {settings.DATABASE_URL.split(':')[0]}")
         
     try:
-        from database.database import engine
+        from backend.database.database import engine
         from sqlalchemy import text
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))

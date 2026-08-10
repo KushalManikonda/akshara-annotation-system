@@ -2,8 +2,8 @@ from datetime import datetime
 
 import streamlit as st
 
-from database.database import SessionLocal
-from database.models import User
+from backend.database.database import SessionLocal
+from backend.database.models import User
 
 
 def logout():
@@ -32,7 +32,7 @@ def logout():
 
     raw_token = st.session_state.get("session_token")
     if raw_token:
-        from services.session_service import destroy_session
+        from backend.services.session_service import destroy_session
         destroy_session(raw_token)
 
     keys = list(st.session_state.keys())

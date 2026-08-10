@@ -7,9 +7,9 @@ Delegates all data aggregation to the existing analytics_service layer.
 
 from fastapi import APIRouter, Depends, HTTPException
 from backend.core.dependencies import get_current_user
-from database.models import User
-from database.enums import UserRole
-from services.analytics_service import (
+from backend.database.models import User
+from backend.database.enums import UserRole
+from backend.services.analytics_service import (
     get_kpi_summary,
     get_pipeline_funnel,
     get_annotation_trend,

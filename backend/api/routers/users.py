@@ -4,10 +4,10 @@ from typing import List
 from backend.core.dependencies import get_current_user
 from backend.core.security import verify_password, hash_password
 from backend.schemas.user import UserResponse, UserCreate, UserUpdate, ChangePassword, AdminSetPassword
-from database.models import User
-from database.enums import UserRole
-from database.database import SessionLocal
-from services.user_service import (
+from backend.database.models import User
+from backend.database.enums import UserRole
+from backend.database.database import SessionLocal
+from backend.services.user_service import (
     get_all_users, get_user_by_id, create_user,
     update_user, delete_user, activate_user, deactivate_user
 )

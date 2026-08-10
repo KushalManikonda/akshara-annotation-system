@@ -9,7 +9,7 @@ import wave
 import contextlib
 from pathlib import Path
 
-from utils.logger import logger
+from backend.utils.logger import logger
 
 
 def get_audio_duration(file_path: str) -> float:

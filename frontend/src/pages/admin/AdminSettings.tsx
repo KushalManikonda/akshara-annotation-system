@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '../../store/auth';
-import { usersApi } from '../../services/api';
+import { usersApi, api } from '../../services/api';
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '0.75rem',
@@ -22,6 +22,28 @@ export default function AdminSettings() {
   const { user } = useAuthStore();
   const [showPwModal, setShowPwModal] = useState(false);
   const [pwData, setPwData] = useState({ current: '', newPw: '', confirm: '' });
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
+
+  // Fetch initial maintenance mode
+  useQuery({
+    queryKey: ['maintenanceMode'],
+    queryFn: async () => {
+      const res = await api.get('/settings/maintenance');
+      setMaintenanceMode(res.data.maintenance_mode);
+      return res.data;
+    },
+  });
+
+  const toggleMaintenance = async () => {
+    try {
+      const newVal = !maintenanceMode;
+      await api.post('/settings/maintenance', { maintenance_mode: newVal });
+      setMaintenanceMode(newVal);
+      toast.success('Maintenance mode updated!');
+    } catch (err) {
+      toast.error('Failed to update maintenance mode');
+    }
+  };
 
   const changePwMutation = useMutation({
     mutationFn: () => usersApi.changePassword(pwData.current, pwData.newPw),
@@ -57,7 +79,7 @@ export default function AdminSettings() {
 
       <div style={{ display: 'grid', gap: '2rem', maxWidth: '600px' }}>
 
-        {/* Profile Settings */}
+        {/* Admin Profile */}
         <div style={{ padding: '1.5rem', background: 'rgba(30,41,59,0.4)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-glass)' }}>
           <h3 style={{ margin: '0 0 1rem 0', fontSize: '1rem' }}>Admin Profile</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -79,23 +101,35 @@ export default function AdminSettings() {
           </div>
         </div>
 
-        {/* System Settings */}
+        {/* Task & Annotation */}
         <div style={{ padding: '1.5rem', background: 'rgba(30,41,59,0.4)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-glass)' }}>
-          <h3 style={{ margin: '0 0 1rem 0', fontSize: '1rem' }}>System Configuration</h3>
+          <h3 style={{ margin: '0 0 1rem 0', fontSize: '1rem' }}>Task & Annotation</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontWeight: 500 }}>Maintenance Mode</div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Disable access for annotators and reviewers</div>
-              </div>
-              <input type="checkbox" style={{ transform: 'scale(1.2)' }} />
-            </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <div style={{ fontWeight: 500 }}>Auto-Assign Tasks</div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Automatically assign new audio to available annotators</div>
               </div>
               <input type="checkbox" defaultChecked style={{ transform: 'scale(1.2)' }} />
+            </div>
+          </div>
+        </div>
+
+        {/* System Settings */}
+        <div style={{ padding: '1.5rem', background: 'rgba(30,41,59,0.4)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-glass)' }}>
+          <h3 style={{ margin: '0 0 1rem 0', fontSize: '1rem' }}>System</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontWeight: 500 }}>Maintenance Mode</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Disable access for annotators and reviewers</div>
+              </div>
+              <input 
+                type="checkbox" 
+                style={{ transform: 'scale(1.2)' }} 
+                checked={maintenanceMode}
+                onChange={toggleMaintenance}
+              />
             </div>
           </div>
         </div>

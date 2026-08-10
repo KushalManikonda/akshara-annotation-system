@@ -17,9 +17,7 @@ import pytest
 
 # ── Add project paths ─────────────────────────────────────────────────────────
 _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-_STREAMLIT_APP = os.path.join(_ROOT, "streamlit_app")
-
-for path in (_ROOT, _STREAMLIT_APP):
+for path in (_ROOT,):
     if path not in sys.path:
         sys.path.insert(0, path)
 
@@ -36,7 +34,7 @@ def test_config_loads():
 # ── 2. Database models importable ─────────────────────────────────────────────
 def test_database_models_importable():
     """All SQLAlchemy models should import without errors."""
-    from database.models import (
+    from backend.database.models import (
         User,
         Dataset,
         AudioFile,
@@ -57,17 +55,17 @@ def test_database_models_importable():
 # ── 3. Services importable ────────────────────────────────────────────────────
 def test_services_importable():
     """All existing services should import without errors."""
-    from services import auth_service, user_service, audio_service
-    from services import assignment_service, annotation_service
-    from services import reviewer_service, task_service
-    from services import analytics_service, session_service
+    from backend.services import auth_service, user_service, audio_service
+    from backend.services import assignment_service, annotation_service
+    from backend.services import reviewer_service, task_service
+    from backend.services import analytics_service, session_service
     print("✅ All services importable.")
 
 
 # ── 4. Enums correct ──────────────────────────────────────────────────────────
 def test_enums():
     """Enum values should match expected strings."""
-    from database.enums import UserRole, AudioStatus, AnnotationState, ApprovalStatus
+    from backend.database.enums import UserRole, AudioStatus, AnnotationState, ApprovalStatus
     assert UserRole.ADMIN == "ADMIN"
     assert UserRole.ANNOTATOR == "ANNOTATOR"
     assert UserRole.REVIEWER == "REVIEWER"

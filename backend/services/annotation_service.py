@@ -2,15 +2,15 @@ from datetime import datetime
 
 from sqlalchemy.orm import Session
 
-from database.database import SessionLocal
-from database.models import AudioFile, Annotation
-from database.enums import AnnotationState, AudioStatus
-from utils.logger import logger
+from backend.database.database import SessionLocal
+from backend.database.models import AudioFile, Annotation
+from backend.database.enums import AnnotationState, AudioStatus
+from backend.utils.logger import logger
 
-from utils.rsml.tokenizer import tokenize
-from utils.rsml.parser import RSMLParser
-from utils.rsml.validator import RSMLValidator
-from utils.rsml.normalizer import RSMLNormalizer
+from backend.utils.rsml.tokenizer import tokenize
+from backend.utils.rsml.parser import RSMLParser
+from backend.utils.rsml.validator import RSMLValidator
+from backend.utils.rsml.normalizer import RSMLNormalizer
 
 parser = RSMLParser()
 validator = RSMLValidator()
@@ -87,8 +87,8 @@ def save_annotation(annotation_id, transcript, rsml):
         if not annotation:
             return False
 
-        if annotation.state in [AnnotationState.SUBMITTED, AnnotationState.APPROVED]:
-            raise ValueError("Cannot edit an annotation that is currently under review or approved.")
+        if annotation.state in (AnnotationState.APPROVED, AnnotationState.SUBMITTED):
+            raise ValueError(f"Cannot edit an annotation that is {annotation.state.value}.")
 
         annotation.transcript = transcript
         annotation.rsml_content = rsml
@@ -137,12 +137,12 @@ def submit_annotation(annotation_id):
         if not annotation:
             return False
 
-        if annotation.state in [AnnotationState.SUBMITTED, AnnotationState.APPROVED]:
-            raise ValueError("Cannot edit an annotation that is currently under review or approved.")
+        if annotation.state in (AnnotationState.APPROVED, AnnotationState.SUBMITTED):
+            raise ValueError(f"Cannot submit an annotation that is {annotation.state.value}.")
 
         # ── Version Snapshot ──────────────────────────────────────────────────
         # Count existing versions so we can assign the next sequential number.
-        from database.models import AnnotationVersion
+        from backend.database.models import AnnotationVersion
         existing_count = (
             db.query(AnnotationVersion)
             .filter(AnnotationVersion.annotation_id == annotation_id)
@@ -208,7 +208,7 @@ def process_transcript(transcript: str):
         messages = validator.validate(ast)
         normalized = normalizer.normalize(ast)
     except ValueError as e:
-        from utils.rsml.validator import ValidationMessage
+        from backend.utils.rsml.validator import ValidationMessage
         ast = []
         messages = [ValidationMessage("ERROR", f"Syntax Error: {str(e)}")]
         normalized = ""
@@ -228,7 +228,7 @@ def format_transcript(transcript: str) -> str:
     tokens = tokenize(transcript)
     try:
         ast = parser.parse(tokens)
-        from utils.rsml.formatter import RSMLFormatter
+        from backend.utils.rsml.formatter import RSMLFormatter
         formatter = RSMLFormatter()
         return formatter.format(ast)
     except ValueError:
@@ -239,7 +239,7 @@ def format_transcript(transcript: str) -> str:
 def get_annotation_versions(audio_id: str):
     db = get_db()
     try:
-        from database.models import AnnotationVersion, Annotation
+        from backend.database.models import AnnotationVersion, Annotation
         annotation = db.query(Annotation).filter(Annotation.audio_id == audio_id).first()
         if not annotation:
             return []
@@ -251,7 +251,7 @@ def get_annotation_versions(audio_id: str):
 def restore_annotation_version(audio_id: str, version_id: str, current_user_id: str):
     db = get_db()
     try:
-        from database.models import AnnotationVersion, Annotation
+        from backend.database.models import AnnotationVersion, Annotation
         annotation = db.query(Annotation).filter(Annotation.audio_id == audio_id).first()
         if not annotation:
             return None

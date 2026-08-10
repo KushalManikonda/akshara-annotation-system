@@ -1,7 +1,7 @@
 import pytest
-from services.reviewer_service import approve, add_comment
-from database.models import User, AudioFile, Annotation, ReviewerApproval, Dataset
-from database.enums import UserRole, AudioStatus, AnnotationState
+from backend.services.reviewer_service import approve, add_comment
+from backend.database.models import User, AudioFile, Annotation, ReviewerApproval, Dataset
+from backend.database.enums import UserRole, AudioStatus, AnnotationState
 
 def test_consensus_approval(db):
     rev1 = User(username="r1", email="r1@b.com", password_hash="h", role=UserRole.REVIEWER, is_active=True)

@@ -23,23 +23,9 @@ from backend.core.config import settings
 from backend.core.security import decode_token
 
 # We import the SQLAlchemy session and models from the shared location
-# (which will be the streamlit_app/ folder during Phase 1-3, then
-# migrated to backend/database/ in later phases)
-import sys
-import os
-
-# Add the streamlit_app path so we can reuse the existing services
-_STREAMLIT_APP = os.path.join(
-    os.path.dirname(__file__),  # backend/core/
-    "..", "..",                  # project root
-    "streamlit_app"
-)
-if _STREAMLIT_APP not in sys.path:
-    sys.path.insert(0, _STREAMLIT_APP)
-
-from database.database import SessionLocal
-from database.models import User
-from database.enums import UserRole
+from backend.database.database import SessionLocal
+from backend.database.models import User
+from backend.database.enums import UserRole
 from sqlalchemy.orm import Session
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -107,6 +93,15 @@ def get_current_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User account is disabled",
         )
+
+    if user.role != UserRole.ADMIN:
+        from backend.database.models import SystemSettings
+        settings_record = db.query(SystemSettings).first()
+        if settings_record and settings_record.maintenance_mode:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Platform is currently undergoing maintenance",
+            )
 
     return user
 

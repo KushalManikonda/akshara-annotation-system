@@ -18,8 +18,8 @@ from sqlalchemy.orm import Session
 
 from backend.core.dependencies import get_current_user, get_db
 from backend.schemas.audio import AudioFileResponse, AudioStatusUpdate
-from database.models import User, AudioFile, Dataset, AuditLog, Annotation, ReviewerApproval, ReviewComment
-from database.enums import UserRole, AudioStatus, AnnotationState, AuditAction, ApprovalStatus
+from backend.database.models import User, AudioFile, Dataset, AuditLog, Annotation, ReviewerApproval, ReviewComment
+from backend.database.enums import UserRole, AudioStatus, AnnotationState, AuditAction, ApprovalStatus
 
 logger = logging.getLogger("akshara.audio")
 
