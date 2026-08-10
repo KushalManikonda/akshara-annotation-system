@@ -1,0 +1,1450 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Wavesurfer Annotator</title>
+  <!-- Load Wavesurfer and Regions Plugin from unpkg CDN -->
+  <script src="https://unpkg.com/wavesurfer.js@7/dist/wavesurfer.min.js"></script>
+  <script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/regions.min.js"></script>
+  <script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/timeline.min.js"></script>
+  <script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/hover.min.js"></script>
+  <!-- Load Tribute for textarea autocomplete -->
+  <link rel="stylesheet" href="https://unpkg.com/tributejs@5.1.3/dist/tribute.css">
+  <script src="https://unpkg.com/tributejs@5.1.3/dist/tribute.min.js"></script>
+  <!-- Load FontAwesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root {
+      --primary-color: #5b46b0;
+      --bg-color: #f7f7fa;
+      --panel-bg: #ffffff;
+      --border-color: #e0e0e0;
+      --text-color: #333333;
+      --segment-bg: #f8f9ff;
+      --segment-border: #d0c8f0;
+      --active-segment-bg: #e6f0ff;
+    }
+    
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      overflow: hidden; /* Prevent body scroll, handle scroll in segments */
+    }
+
+    .container {
+      display: flex;
+      flex-direction: row;
+      height: 85vh; /* Adjusted to fit nicely in iframe */
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--panel-bg);
+    }
+
+    /* LEFT PANE: Audio Player */
+    .left-pane {
+      flex: 1.2;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border-color);
+      padding: 20px;
+    }
+
+    .player-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    
+    .player-controls {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      background: #f1f3f4;
+      padding: 10px 20px;
+      border-radius: 30px;
+    }
+    
+    .btn-play {
+      background: none;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      color: var(--primary-color);
+    }
+
+    .time-display {
+      font-family: monospace;
+      font-size: 14px;
+    }
+
+    .sliders {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 20px;
+      font-size: 13px;
+      color: #666;
+    }
+
+    .waveform-container {
+      position: relative;
+      width: 100%;
+      flex: 1;
+      min-height: 150px;
+      max-height: 200px;
+      background: #fdfdfd;
+      border: 1px solid #eee;
+      border-radius: 4px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    /* Custom Progress Bar */
+    .custom-progress {
+      width: 100%;
+      padding: 10px 0;
+      display: flex;
+      align-items: center;
+    }
+    .custom-progress input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%;
+      background: transparent;
+      outline: none;
+      margin: 0;
+    }
+    .custom-progress input[type="range"]::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 4px;
+      background: #ddd;
+      border-radius: 2px;
+    }
+    .custom-progress input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      height: 12px;
+      width: 12px;
+      border-radius: 50%;
+      background: black;
+      margin-top: -4px;
+      cursor: pointer;
+    }
+    .custom-progress input[type="range"]:focus::-webkit-slider-runnable-track {
+      background: #ccc;
+    }
+
+    .right-pane {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-color);
+    }
+
+    .segments-header {
+      background: #e6e3f5;
+      padding: 12px;
+      text-align: center;
+      font-weight: 600;
+      color: var(--primary-color);
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .segments-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .segment-item {
+      background: var(--panel-bg);
+      border: 1px solid var(--segment-border);
+      border-radius: 6px;
+      overflow: visible; /* Allow handle to protrude */
+      display: flex;
+      flex-direction: column;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+      margin-bottom: 10px;
+    }
+
+    .resize-handle {
+      position: absolute;
+      bottom: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 24px;
+      height: 24px;
+      background: #fff;
+      border: 1px solid var(--border-color);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: ns-resize;
+      z-index: 10;
+      color: #666;
+      font-size: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .segment-item.active {
+      border-color: #2196F3;
+      box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+    }
+
+    .segment-header-bar {
+      display: flex;
+      align-items: center;
+      padding: 8px 12px;
+      background: var(--segment-bg);
+      border-bottom: 1px solid var(--segment-border);
+      gap: 10px;
+    }
+    
+    .segment-item.active .segment-header-bar {
+      background: var(--active-segment-bg);
+      border-bottom-color: #b3d4ff;
+    }
+
+    .segment-id {
+      background: var(--primary-color);
+      color: white;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    .time-input {
+      background: #666;
+      color: white;
+      border: none;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 12px;
+      text-align: center;
+      width: 70px;
+    }
+
+    .speaker-select {
+      flex: 1;
+      padding: 4px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+
+    .segment-body {
+      padding: 12px;
+      display: flex;
+      gap: 15px;
+      overflow: hidden;
+      min-height: 120px;
+      padding-bottom: 12px;
+    }
+
+    .segment-half {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      min-width: 0;
+    }
+
+    .segment-half-title {
+      font-size: 11px;
+      color: #777;
+      margin-bottom: 5px;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    .text-area {
+      width: 100%;
+      flex-grow: 1;
+      border: 1px solid transparent;
+      resize: none;
+      overflow-y: auto;
+      font-family: inherit;
+      font-size: 14px;
+      outline: none;
+      box-sizing: border-box;
+    }
+    
+    .text-area:focus {
+      border-color: var(--border-color);
+    }
+
+    .text-area.readonly {
+      background: #f5f5f5;
+      color: #555;
+      cursor: not-allowed;
+    }
+
+    .rich-preview {
+      width: 100%;
+      flex-grow: 1;
+      padding: 8px;
+      overflow-y: auto;
+      resize: none;
+      background: #fdfdfd;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      font-size: 14px;
+      box-sizing: border-box;
+      line-height: 1.8;
+      cursor: default;
+      white-space: pre-wrap;
+      overflow-wrap: break-word;
+      word-wrap: break-word;
+      word-break: break-all;
+    }
+    
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 0 6px;
+      border-radius: 4px;
+      margin: 0 3px;
+      font-size: 12px;
+      font-weight: 500;
+      border: 1px solid;
+      cursor: help;
+    }
+    .chip-hesitation { background: #fff8e1; border-color: #ffe082; color: #f57f17; }
+    .chip-paralinguistic { background: #e8f5e9; border-color: #a5d6a7; color: #2e7d32; }
+    .chip-other { background: #e3f2fd; border-color: #90caf9; color: #1565c0; }
+    .chip-speaker { background: #ede7f6; border-color: #d1c4e9; color: #4527a0; }
+    .chip-bracket { background: #e0f7fa; border-color: #80deea; color: #00838f; }
+    .chip-language { background: #fce4ec; border-color: #f48fb1; color: #c2185b; }
+    .chip-icon { margin-right: 4px; font-size: 10px; }
+    
+    .chip-error {
+      background: #ffebee;
+      border-color: #ffcdd2;
+      color: #d32f2f;
+      border-style: dashed;
+    }
+    
+    .speaker-label {
+      font-size: 10px;
+      color: #7e57c2;
+      font-weight: bold;
+      margin-top: 8px;
+      margin-bottom: 4px;
+      border: 1px solid #d1c4e9;
+      display: block;
+      width: fit-content;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #f3e5f5;
+    }
+    
+    .error-box {
+      color: #d32f2f;
+      font-size: 12px;
+      margin-top: 5px;
+      display: none;
+    }
+
+    /* Loader */
+    #loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 18px;
+      color: #666;
+    }
+
+    /* Shortcuts Dropdown */
+    .dropdown {
+      position: relative;
+      display: inline-block;
+    }
+    
+    .dropbtn {
+      background-color: var(--segment-bg);
+      color: var(--primary-color);
+      padding: 8px 12px;
+      font-size: 13px;
+      border: 1px solid var(--segment-border);
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    
+    .dropbtn:hover {
+      background-color: var(--active-segment-bg);
+    }
+    
+    .dropdown-content {
+      display: none;
+      position: absolute;
+      right: 0;
+      background-color: #fff;
+      min-width: 200px;
+      box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+      z-index: 100;
+      border-radius: 4px;
+      border: 1px solid var(--border-color);
+      padding: 10px;
+      font-size: 13px;
+      color: #333;
+    }
+    
+    .dropdown-content p {
+      margin: 5px 0;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .dropdown-content kbd {
+      background-color: #eee;
+      border-radius: 3px;
+      border: 1px solid #b4b4b4;
+      box-shadow: 0 1px 1px rgba(0,0,0,.2), 0 2px 0 0 rgba(255,255,255,.7) inset;
+      color: #333;
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1;
+      padding: 2px 4px;
+      white-space: nowrap;
+    }
+    
+    .dropdown:hover .dropdown-content {
+      display: block;
+    }
+
+    .action-btn {
+      background: none;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      padding: 4px 8px;
+      cursor: pointer;
+      color: #555;
+      background: #fff;
+    }
+    
+    .action-btn:hover {
+      background: #eee;
+    }
+    
+    .delete-btn {
+      color: #d32f2f;
+    }
+    
+    .delete-btn:hover {
+      background: #ffebee;
+      border-color: #ffcdd2;
+    }
+
+    #toast {
+      visibility: hidden;
+      min-width: 250px;
+      background-color: #333;
+      color: #fff;
+      text-align: center;
+      border-radius: 2px;
+      padding: 16px;
+      position: fixed;
+      z-index: 1000;
+      left: 50%;
+      bottom: 30px;
+      transform: translateX(-50%);
+      font-size: 14px;
+    }
+    #toast.show {
+      visibility: visible;
+      animation: fadein 0.5s, fadeout 0.5s 2.5s;
+    }
+    @keyframes fadein {
+      from {bottom: 0; opacity: 0;}
+      to {bottom: 30px; opacity: 1;}
+    }
+    @keyframes fadeout {
+      from {bottom: 30px; opacity: 1;}
+      to {bottom: 0; opacity: 0;}
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    
+    <div class="left-pane">
+      <div class="player-header">
+        <h3 id="taskTitle" style="margin:0; color: #444; font-weight: 500;">Task #</h3>
+        <div style="display:flex; gap: 10px;">
+          <button class="dropbtn" onclick="addSegmentBtn()"><i class="fas fa-plus"></i> Add Segment</button>
+          <div class="dropdown">
+            <button class="dropbtn"><i class="fas fa-keyboard"></i> Shortcuts</button>
+            <div class="dropdown-content">
+              <p><span>Play / Pause</span> <kbd>Space</kbd></p>
+              <p><span>-10s / +10s</span> <kbd>&larr;</kbd> / <kbd>&rarr;</kbd></p>
+              <p><span>Prev Task</span> <kbd>Shift</kbd> + <kbd>&larr;</kbd></p>
+              <p><span>Next Task</span> <kbd>Shift</kbd> + <kbd>&rarr;</kbd></p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="waveform-container" id="waveform">
+        <div id="loading">Loading audio...</div>
+      </div>
+      <div id="timeline" style="margin-top: 5px; font-family: monospace; font-size: 11px; color: #666;"></div>
+
+      <div class="custom-progress">
+        <input type="range" id="audioProgress" min="0" max="100" value="0" step="0.1" oninput="seekAudio(this.value)">
+      </div>
+
+      <div class="player-controls">
+        <button class="btn-play" id="prevBtn" onclick="sendAction('prev_task')" title="Previous Task (Shift + Left)"><i class="fas fa-step-backward"></i></button>
+        <button class="btn-play" id="backward10Btn" onclick="skip(-10)" title="Rewind 10s (Left Arrow)"><i class="fas fa-undo"></i></button>
+        <button class="btn-play" id="playBtn" onclick="togglePlay()" title="Play/Pause (Space)"><i class="fas fa-play"></i></button>
+        <button class="btn-play" id="forward10Btn" onclick="skip(10)" title="Forward 10s (Right Arrow)"><i class="fas fa-redo"></i></button>
+        <button class="btn-play" id="nextBtn" onclick="sendAction('next_task')" title="Next Task (Shift + Right)"><i class="fas fa-step-forward"></i></button>
+        <div class="time-display" id="timeDisplay">00:00 / 00:00</div>
+      </div>
+      
+      <div class="sliders" style="margin-top: 15px;">
+        <label>
+          Playback Speed: <span id="speedVal">1.0</span>x
+          <input type="range" id="speedSlider" min="0.5" max="2" step="0.1" value="1" oninput="setSpeed(this.value)">
+        </label>
+        <label>
+          Timeline Scale:
+          <input type="range" id="zoomSlider" min="10" max="100" step="1" value="10" oninput="setZoom(this.value)">
+        </label>
+      </div>
+    </div>
+
+    <div class="right-pane">
+      <div class="segments-header">RSML Transcription</div>
+      <div class="segments-list" id="segmentsList">
+        <!-- Segments will be injected here -->
+      </div>
+    </div>
+  </div>
+  <div id="toast"></div>
+
+  <script>
+    let wavesurfer = null;
+    let wsRegions = null;
+    let currentSegments = [];
+    let activeSegmentId = null;
+    let audioReady = false;
+    let playingRegionEnd = null; 
+    
+    // Undo / Redo state
+    let undoStack = [];
+    let redoStack = [];
+
+    function cloneSegments(segs) {
+       return JSON.parse(JSON.stringify(segs));
+    }
+
+    function pushState() {
+       undoStack.push(cloneSegments(currentSegments));
+       if (undoStack.length > 50) undoStack.shift();
+       redoStack = []; 
+    }
+
+    function undoAction() {
+       if (undoStack.length === 0) return;
+       redoStack.push(cloneSegments(currentSegments));
+       currentSegments = undoStack.pop();
+       renderSegments();
+       sendSaveEvent();
+    }
+
+    function redoAction() {
+       if (redoStack.length === 0) return;
+       undoStack.push(cloneSegments(currentSegments));
+       currentSegments = redoStack.pop();
+       renderSegments();
+       sendSaveEvent();
+    }
+
+    const rsmlTags = [
+        "breathe", "broken-word-end", "broken-word-start", "cough", "cry",
+        "crying-end", "crying-start", "eating-sounds", "ehh", "emphasis-end", 
+        "emphasis-start", "falling-pitch-end", "falling-pitch-start", "false-start-end", "false-start-start", 
+        "filler-end", "filler-start", "groan", "hmm", "huh",
+        "hum", "humming-end", "humming-start", "laughing-end", "laughing-start",
+        "laughter", "nose-blowing", "prolongation-end", "prolongation-start", "raising-pitch-end",
+        "raising-pitch-start", "repair-end", "repair-start", "repetition-end", "repetition-start",
+        "sigh", "silence", "singing-end", "singing-start", "sneeze",
+        "sniff", "snore", "stutter-block", "throat-clearing", "tsk",
+        "ugh", "uh-huh", "uhh", "umm", "unintelligible",
+        "whispering-end", "whispering-start", "whistling-end", "whistling-start", "yawn", 
+        "yelling-end", "yelling-start"
+    ];
+
+    let tribute = new Tribute({
+        values: rsmlTags.map(tag => ({key: tag, value: tag})),
+        selectTemplate: function (item) {
+            return '@' + item.original.value;
+        },
+        requireLeadingSpace: false,
+        noMatchTemplate: function () {
+            return '<span style:"visibility: hidden;"></span>';
+        }
+    });
+
+    // ----- Streamlit Component API -----
+    function sendValue(value) {
+      window.parent.postMessage({
+        isStreamlitMessage: true,
+        type: "streamlit:setComponentValue",
+        value: value,
+      }, "*");
+    }
+
+    function setFrameHeight(height) {
+      window.parent.postMessage({
+        isStreamlitMessage: true,
+        type: "streamlit:setFrameHeight",
+        height: height,
+      }, "*");
+    }
+
+    function formatTime(seconds) {
+      if (isNaN(seconds)) return "00:00.000";
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      const s = Math.floor(seconds % 60);
+      const ms = Math.floor((seconds % 1) * 1000);
+      
+      let res = "";
+      if (h > 0) res += h.toString().padStart(2, '0') + ":";
+      res += m.toString().padStart(2, '0') + ":" + s.toString().padStart(2, '0');
+      res += "." + ms.toString().padStart(3, '0');
+      return res;
+    }
+
+    function initWavesurfer(audioUrl) {
+      if (wavesurfer) {
+        wavesurfer.destroy();
+      }
+
+      wavesurfer = WaveSurfer.create({
+        container: '#waveform',
+        waveColor: '#b4ebd3',
+        progressColor: '#1bb572',
+        cursorColor: '#ff5722',
+        barWidth: 2,
+        barGap: 1,
+        barRadius: 2,
+        height: 'auto',
+        normalize: true,
+        minPxPerSec: 10
+      });
+
+      wsRegions = wavesurfer.registerPlugin(WaveSurfer.Regions.create());
+      
+      wavesurfer.registerPlugin(WaveSurfer.Timeline.create({
+        container: '#timeline',
+        height: 20,
+        timeInterval: 1,
+        primaryLabelInterval: 5,
+        secondaryLabelInterval: 1,
+        formatTimeCallback: (sec) => formatTime(sec)
+      }));
+
+      wavesurfer.registerPlugin(WaveSurfer.Hover.create({
+        lineColor: '#ff0000',
+        lineWidth: 2,
+        labelBackground: '#222',
+        labelColor: '#fff',
+        labelSize: '12px',
+      }));
+
+      wavesurfer.on('ready', () => {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('timeDisplay').innerText = `00:00 / ${formatTime(wavesurfer.getDuration())}`;
+        audioReady = true;
+        
+        // If segments were provided before ready, render them now
+        if (currentSegments.length > 0) {
+            renderSegments();
+        } else {
+            // Default empty segment if none
+            currentSegments = [{
+                id: 1,
+                start: 0,
+                end: Math.min(wavesurfer.getDuration(), 5),
+                speaker: "Speaker 0 (Female)",
+                text: ""
+            }];
+            renderSegments();
+        }
+      });
+
+      wavesurfer.on('audioprocess', (time) => {
+        document.getElementById('timeDisplay').innerText = `${formatTime(time)} / ${formatTime(wavesurfer.getDuration())}`;
+        
+        // Update custom progress bar
+        const duration = wavesurfer.getDuration();
+        if (duration > 0) {
+           document.getElementById('audioProgress').value = (time / duration) * 100;
+        }
+
+        // Pause if we reached the end of a playing region
+        if (playingRegionEnd !== null && time >= playingRegionEnd) {
+            wavesurfer.pause();
+            playingRegionEnd = null;
+        }
+      });
+      
+      wavesurfer.on('seek', (time) => {
+         document.getElementById('timeDisplay').innerText = `${formatTime(wavesurfer.getCurrentTime())} / ${formatTime(wavesurfer.getDuration())}`;
+         playingRegionEnd = null; // clear region bounds on manual seek
+         
+         const duration = wavesurfer.getDuration();
+         if (duration > 0) {
+            document.getElementById('audioProgress').value = (wavesurfer.getCurrentTime() / duration) * 100;
+         }
+         
+         // Only auto-play if we actually sought manually and we aren't currently dragging
+         wavesurfer.play(); 
+      });
+
+      wavesurfer.on('play', () => {
+        document.getElementById('playBtn').innerHTML = '<i class="fas fa-pause"></i>';
+      });
+
+      wavesurfer.on('pause', () => {
+        document.getElementById('playBtn').innerHTML = '<i class="fas fa-play"></i>';
+      });
+
+      wsRegions.on('region-clicked', (region, e) => {
+        e.stopPropagation();
+        activateSegment(region.id);
+      });
+      
+      wsRegions.on('region-double-clicked', (region, e) => {
+        e.stopPropagation();
+        activateSegment(region.id);
+        playingRegionEnd = region.end;
+        region.play();
+      });
+      
+      wsRegions.on('region-updated', (region) => {
+         // Update segment list data in UI only, don't push state yet
+         const seg = currentSegments.find(s => s.id == region.id);
+         if (seg) {
+             document.getElementById(`start-${seg.id}`).value = formatTime(region.start);
+             document.getElementById(`end-${seg.id}`).value = formatTime(region.end);
+         }
+      });
+      
+      wsRegions.on('region-update-end', (region) => {
+         const segIndex = currentSegments.findIndex(s => s.id == region.id);
+         if (segIndex > -1) {
+             let tempSegments = cloneSegments(currentSegments);
+             tempSegments[segIndex].start = region.start;
+             tempSegments[segIndex].end = region.end;
+             
+             let validation = validateSegments(tempSegments);
+             if (validation.valid) {
+                 pushState();
+                 currentSegments = tempSegments;
+                 sendSaveEvent();
+             } else {
+                 // revert region visually
+                 region.setOptions({ start: currentSegments[segIndex].start, end: currentSegments[segIndex].end });
+                 updateSegmentUI(region.id); // restore inputs
+                 showToast(validation.msg);
+             }
+         } else {
+             // It's a new region created by dragging on waveform
+             pushState();
+             let newSeg = {
+                 id: region.id,
+                 start: region.start,
+                 end: region.end,
+                 speaker: "Speaker 0 (Female)",
+                 text: ""
+             };
+             let tempSegments = cloneSegments(currentSegments);
+             tempSegments.push(newSeg);
+             let validation = validateSegments(tempSegments);
+             if (validation.valid) {
+                 currentSegments = tempSegments;
+                 currentSegments.sort((a,b) => a.start - b.start);
+                 renderSegments();
+                 sendSaveEvent();
+             } else {
+                 region.remove();
+                 undoStack.pop();
+                 showToast(validation.msg);
+             }
+         }
+      });
+
+      // Enable dragging on waveform to create regions
+      wsRegions.enableDragSelection({
+          color: 'rgba(91, 70, 176, 0.2)'
+      });
+
+      wavesurfer.load(audioUrl);
+    }
+
+    // Resize functionality
+    let isResizing = false;
+    let currentResizingBody = null;
+    let startY = 0;
+    let startHeight = 0;
+
+    function startResize(e, id) {
+       e.stopPropagation();
+       e.preventDefault();
+       isResizing = true;
+       currentResizingBody = document.getElementById(`seg-body-${id}`);
+       startY = e.clientY;
+       startHeight = parseInt(document.defaultView.getComputedStyle(currentResizingBody).height, 10);
+       document.addEventListener('mousemove', doResize);
+       document.addEventListener('mouseup', stopResize);
+    }
+
+    function doResize(e) {
+       if (!isResizing || !currentResizingBody) return;
+       let newHeight = startHeight + (e.clientY - startY);
+       if (newHeight < 80) newHeight = 80; // minimum height
+       currentResizingBody.style.height = newHeight + 'px';
+    }
+
+    function stopResize() {
+       isResizing = false;
+       currentResizingBody = null;
+       document.removeEventListener('mousemove', doResize);
+       document.removeEventListener('mouseup', stopResize);
+    }
+    
+    function toggleExpand(id) {
+       // Only toggle if we didn't just drag
+       let body = document.getElementById(`seg-body-${id}`);
+       let ta = document.getElementById(`text-${id}`);
+       let rp = document.getElementById(`rich-preview-${id}`);
+       if (!body || !ta || !rp) return;
+       
+       if (body.classList.contains('expanded')) {
+           body.classList.remove('expanded');
+           body.style.height = '';
+       } else {
+           body.classList.add('expanded');
+           // Temporarily set textarea height to 1px to get true scrollHeight
+           let oldTaHeight = ta.style.height;
+           ta.style.height = '1px';
+           let neededHeight = Math.max(ta.scrollHeight, rp.scrollHeight);
+           ta.style.height = oldTaHeight;
+           
+           // Ensure it's reasonably larger, minimum 200px
+           let newHeight = Math.max(neededHeight + 60, 250); 
+           body.style.height = newHeight + 'px';
+       }
+    }
+
+    function togglePlay() {
+      if (wavesurfer) wavesurfer.playPause();
+    }
+    
+    function seekAudio(percent) {
+      if (wavesurfer) {
+        const duration = wavesurfer.getDuration();
+        if (duration > 0) {
+           wavesurfer.seekTo(percent / 100);
+        }
+      }
+    }
+    
+    function skip(seconds) {
+      if (wavesurfer) {
+        const currentTime = wavesurfer.getCurrentTime();
+        const duration = wavesurfer.getDuration();
+        let newTime = currentTime + seconds;
+        if (newTime < 0) newTime = 0;
+        if (newTime > duration) newTime = duration;
+        wavesurfer.seekTo(newTime / duration);
+      }
+    }
+
+    function setSpeed(val) {
+      document.getElementById('speedVal').innerText = parseFloat(val).toFixed(1);
+      if (wavesurfer) wavesurfer.setPlaybackRate(val);
+    }
+
+    function setZoom(val) {
+      if (wavesurfer) wavesurfer.zoom(Number(val));
+    }
+    
+    function showToast(msg) {
+        var x = document.getElementById("toast");
+        x.innerText = msg;
+        x.className = "show";
+        setTimeout(function(){ x.className = x.className.replace("show", ""); }, 3000);
+    }
+    
+    function validateSegments(segmentsToTest) {
+        for (let i = 0; i < segmentsToTest.length; i++) {
+            let seg = segmentsToTest[i];
+            if (seg.start < 0) return { valid: false, msg: "Start time cannot be negative." };
+            if (wavesurfer && seg.end > wavesurfer.getDuration()) return { valid: false, msg: "End time exceeds audio duration." };
+            if (seg.end <= seg.start) return { valid: false, msg: "End time must be greater than start time." };
+            
+            // Overlap check
+            for (let j = 0; j < segmentsToTest.length; j++) {
+                if (i === j) continue;
+                let other = segmentsToTest[j];
+                // Check if they overlap (open intervals)
+                if (seg.start < other.end && seg.end > other.start) {
+                    return { valid: false, msg: "Segments cannot overlap." };
+                }
+            }
+        }
+        return { valid: true };
+    }
+    
+    function updateTimestamp(id, field) {
+        let el = document.getElementById(`${field}-${id}`);
+        let valStr = el.value;
+        let parts = valStr.split(':');
+        let seconds = 0;
+        if (parts.length === 2) {
+            seconds = parseInt(parts[0]) * 60 + parseFloat(parts[1]);
+        } else if (parts.length === 3) {
+            seconds = parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseFloat(parts[2]);
+        } else {
+            seconds = parseFloat(valStr);
+        }
+        if (isNaN(seconds)) seconds = 0;
+        
+        let segIndex = currentSegments.findIndex(s => s.id == id);
+        if (segIndex > -1) {
+            let tempSegments = cloneSegments(currentSegments);
+            tempSegments[segIndex][field] = seconds;
+            let validation = validateSegments(tempSegments);
+            if (validation.valid) {
+                pushState();
+                currentSegments = tempSegments;
+                currentSegments.sort((a,b) => a.start - b.start);
+                renderSegments();
+                sendSaveEvent();
+            } else {
+                // revert visually in input
+                el.value = formatTime(currentSegments[segIndex][field]);
+                showToast(validation.msg);
+            }
+        }
+    }
+    
+    function splitSegment(id) {
+        pushState();
+        const segIndex = currentSegments.findIndex(s => s.id == id);
+        if (segIndex === -1) return;
+        const seg = currentSegments[segIndex];
+        const time = wavesurfer.getCurrentTime();
+        
+        if (time > seg.start && time < seg.end) {
+            const oldEnd = seg.end;
+            seg.end = time;
+            const newSeg = {
+                id: Date.now().toString(),
+                start: time,
+                end: oldEnd,
+                speaker: seg.speaker,
+                text: seg.text // Duplicate transcript optionally
+            };
+            currentSegments.splice(segIndex + 1, 0, newSeg);
+            renderSegments();
+            sendSaveEvent();
+        } else {
+            undoStack.pop();
+            showToast("Playback cursor must be inside the segment to split it.");
+        }
+    }
+    
+    function deleteSegment(id) {
+        pushState();
+        const segIndex = currentSegments.findIndex(s => s.id == id);
+        if (segIndex > -1) {
+            currentSegments.splice(segIndex, 1);
+            if (activeSegmentId == id) activeSegmentId = null;
+            renderSegments();
+            sendSaveEvent();
+        }
+    }
+    
+    function addSegmentBtn() {
+        if (!wavesurfer) return;
+        pushState();
+        const time = wavesurfer.getCurrentTime();
+        const duration = wavesurfer.getDuration();
+        let newEnd = time + 2.0;
+        if (newEnd > duration) newEnd = duration;
+        
+        let newSeg = {
+            id: Date.now().toString(),
+            start: time,
+            end: newEnd,
+            speaker: "Speaker 0 (Female)",
+            text: ""
+        };
+        
+        let tempSegments = cloneSegments(currentSegments);
+        tempSegments.push(newSeg);
+        let validation = validateSegments(tempSegments);
+        
+        if (validation.valid) {
+            currentSegments = tempSegments;
+            currentSegments.sort((a,b) => a.start - b.start);
+            renderSegments();
+            sendSaveEvent();
+        } else {
+            undoStack.pop();
+            showToast("Cannot add segment here: " + validation.msg);
+        }
+    }
+
+    function renderSegments() {
+      wsRegions.clearRegions();
+      const listEl = document.getElementById('segmentsList');
+      listEl.innerHTML = '';
+
+      currentSegments.forEach((seg, index) => {
+        // Add text label to region
+        const contentEl = document.createElement('div');
+        contentEl.textContent = seg.text;
+        contentEl.id = `region-text-${seg.id}`;
+        contentEl.style.padding = '2px 4px';
+        contentEl.style.fontSize = '10px';
+        contentEl.style.color = '#333';
+        contentEl.style.whiteSpace = 'nowrap';
+        contentEl.style.overflow = 'hidden';
+        contentEl.style.textOverflow = 'ellipsis';
+        contentEl.style.pointerEvents = 'none'; // so it doesn't block dragging
+
+        // Add region to waveform
+        wsRegions.addRegion({
+          id: seg.id,
+          start: seg.start,
+          end: seg.end,
+          color: 'rgba(91, 70, 176, 0.2)',
+          content: contentEl,
+          drag: true,
+          resize: true
+        });
+
+        // Add to list
+        const item = document.createElement('div');
+        item.className = 'segment-item';
+        item.id = `seg-${seg.id}`;
+        item.onclick = () => activateSegment(seg.id, true);
+
+
+        item.innerHTML = `
+          <div class="segment-header-bar">
+            <div class="segment-id">${index + 1}</div>
+            <input type="text" class="time-input" id="start-${seg.id}" value="${formatTime(seg.start)}" onchange="updateTimestamp('${seg.id}', 'start')" title="Edit Start Time">
+            <select class="speaker-select" id="speaker-${seg.id}" onchange="updateData('${seg.id}')">
+              <option value="Speaker 0 (Female)" ${seg.speaker === 'Speaker 0 (Female)' ? 'selected' : ''}>Speaker 0 (Female)</option>
+              <option value="Speaker 1 (Male)" ${seg.speaker === 'Speaker 1 (Male)' ? 'selected' : ''}>Speaker 1 (Male)</option>
+              <option value="Speaker 2 (Female)" ${seg.speaker === 'Speaker 2 (Female)' ? 'selected' : ''}>Speaker 2 (Female)</option>
+            </select>
+            <input type="text" class="time-input" id="end-${seg.id}" value="${formatTime(seg.end)}" onchange="updateTimestamp('${seg.id}', 'end')" title="Edit End Time">
+            <button class="action-btn" onclick="splitSegment('${seg.id}'); event.stopPropagation();" title="Split at Cursor"><i class="fas fa-cut"></i></button>
+            <button class="action-btn delete-btn" onclick="deleteSegment('${seg.id}'); event.stopPropagation();" title="Delete Segment"><i class="fas fa-trash"></i></button>
+          </div>
+          <div class="segment-body">
+            <div class="segment-half">
+              <div class="segment-half-title">Editable ASR Transcript</div>
+              <textarea class="text-area" id="text-${seg.id}" onchange="updateData('${seg.id}')" oninput="updateNormalizedPreview('${seg.id}')" onclick="event.stopPropagation()">${seg.text}</textarea>
+              <div id="error-${seg.id}" class="error-box"></div>
+            </div>
+            <div class="segment-half">
+              <div class="segment-half-title">Normalized Preview</div>
+              <div class="rich-preview" id="rich-preview-${seg.id}"></div>
+            </div>
+          </div>
+          <div class="resize-handle" onmousedown="startResize(event, ${seg.id})" onclick="toggleExpand(${seg.id}); event.stopPropagation()">
+            <i class="fas fa-arrows-alt-v"></i>
+          </div>
+        `;
+        listEl.appendChild(item);
+      });
+
+      // Attach Tribute to all new textareas
+      tribute.attach(document.querySelectorAll('.text-area'));
+      
+      // Initialize preview and validation for all segments
+      currentSegments.forEach(seg => updateNormalizedPreview(seg.id));
+    }
+    
+    function updateSegmentUI(id) {
+        const seg = currentSegments.find(s => s.id == id);
+        if (seg) {
+            document.getElementById(`start-${id}`).value = formatTime(seg.start);
+            document.getElementById(`end-${id}`).value = formatTime(seg.end);
+        }
+    }
+
+    function activateSegment(id, seek = false) {
+      if (activeSegmentId) {
+        const oldEl = document.getElementById(`seg-${activeSegmentId}`);
+        if (oldEl) oldEl.classList.remove('active');
+        if (wsRegions) {
+            const oldRegion = wsRegions.getRegions().find(r => r.id == activeSegmentId);
+            if (oldRegion) oldRegion.setOptions({ color: 'rgba(91, 70, 176, 0.2)' });
+        }
+      }
+      activeSegmentId = id;
+      const el = document.getElementById(`seg-${id}`);
+      if (el) {
+        el.classList.add('active');
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      
+      if (wsRegions) {
+         const newRegion = wsRegions.getRegions().find(r => r.id == id);
+         if (newRegion) newRegion.setOptions({ color: 'rgba(91, 70, 176, 0.6)' });
+      }
+
+      if (seek && wavesurfer) {
+        const seg = currentSegments.find(s => s.id == id);
+        if (seg) {
+          const duration = wavesurfer.getDuration();
+          if (duration > 0) {
+            wavesurfer.seekTo(seg.start / duration);
+          }
+        }
+      }
+    }
+    
+    // Global Keyboard Shortcuts
+    window.addEventListener('keydown', function(e) {
+      if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+      
+      // Prevent default on shortcuts to avoid scrolling/browser actions
+      if (['Space', 'ArrowLeft', 'ArrowRight', 'Delete'].includes(e.code) || (e.ctrlKey && ['KeyZ', 'KeyY', 'KeyD', 'KeyS'].includes(e.code))) {
+          e.preventDefault();
+      }
+
+      if (e.ctrlKey && e.code === 'KeyZ') {
+          undoAction();
+          return;
+      }
+      if (e.ctrlKey && e.code === 'KeyY') {
+          redoAction();
+          return;
+      }
+
+      if (e.ctrlKey && e.code === 'KeyD') {
+          if (activeSegmentId) {
+              pushState();
+              let seg = currentSegments.find(s => s.id == activeSegmentId);
+              if (seg) {
+                  let duration = seg.end - seg.start;
+                  let newSeg = {
+                      id: Date.now().toString(),
+                      start: seg.end,
+                      end: seg.end + duration,
+                      speaker: seg.speaker,
+                      text: seg.text
+                  };
+                  if (wavesurfer && newSeg.end > wavesurfer.getDuration()) newSeg.end = wavesurfer.getDuration();
+                  let tempSegments = cloneSegments(currentSegments);
+                  tempSegments.push(newSeg);
+                  let v = validateSegments(tempSegments);
+                  if (v.valid) {
+                      currentSegments = tempSegments;
+                      currentSegments.sort((a,b) => a.start - b.start);
+                      renderSegments();
+                      sendSaveEvent();
+                  } else {
+                      undoStack.pop();
+                      showToast("Cannot duplicate: " + v.msg);
+                  }
+              }
+          }
+          return;
+      }
+      if (e.ctrlKey && e.code === 'KeyS') {
+          sendSaveEvent();
+          showToast("Saved metadata.");
+          return;
+      }
+      if (e.code === 'Delete') {
+          if (activeSegmentId) deleteSegment(activeSegmentId);
+          return;
+      }
+
+      switch (e.code) {
+        case 'Space':
+          togglePlay();
+          break;
+        case 'ArrowLeft':
+          if (activeSegmentId) {
+              let idx = currentSegments.findIndex(s => s.id == activeSegmentId);
+              if (idx > -1) {
+                  let tempSegments = cloneSegments(currentSegments);
+                  if (e.shiftKey) {
+                      tempSegments[idx].end -= 0.1; // resize edge
+                  } else {
+                      tempSegments[idx].start -= 0.1; // move both
+                      tempSegments[idx].end -= 0.1;
+                  }
+                  let v = validateSegments(tempSegments);
+                  if (v.valid) {
+                      pushState();
+                      currentSegments = tempSegments;
+                      renderSegments();
+                      sendSaveEvent();
+                  }
+              }
+          } else {
+              skip(-10);
+          }
+          break;
+        case 'ArrowRight':
+          if (activeSegmentId) {
+              let idx = currentSegments.findIndex(s => s.id == activeSegmentId);
+              if (idx > -1) {
+                  let tempSegments = cloneSegments(currentSegments);
+                  if (e.shiftKey) {
+                      tempSegments[idx].end += 0.1; // resize edge
+                  } else {
+                      tempSegments[idx].start += 0.1; // move both
+                      tempSegments[idx].end += 0.1;
+                  }
+                  let v = validateSegments(tempSegments);
+                  if (v.valid) {
+                      pushState();
+                      currentSegments = tempSegments;
+                      renderSegments();
+                      sendSaveEvent();
+                  }
+              }
+          } else {
+              skip(10);
+          }
+          break;
+      }
+    });
+
+    function updateData(id) {
+      const seg = currentSegments.find(s => s.id === id);
+      if (seg) {
+        seg.speaker = document.getElementById(`speaker-${id}`).value;
+        seg.text = document.getElementById(`text-${id}`).value;
+        sendSaveEvent();
+      }
+    }
+
+    function getTagCategory(tag) {
+        const hesitations = ['umm','uhh','hmm','ugh','huh','tsk','uh-huh','ehh'];
+        const paralinguistics = ['laughter','cry','hum','breathe','sniff','nose-blowing','cough','sneeze','throat-clearing','yawn','eating-sounds','snore','groan','sigh'];
+        const otherIsolated = ['silence','unintelligible','stutter-block'];
+        
+        if (hesitations.includes(tag)) return { cat: 'Hesitation', cls: 'chip-hesitation' };
+        if (paralinguistics.includes(tag)) return { cat: 'Paralinguistic', cls: 'chip-paralinguistic' };
+        if (otherIsolated.includes(tag)) return { cat: 'Other', cls: 'chip-other' };
+        if (tag.includes('start') || tag.includes('end')) {
+            if (tag.startsWith('s')) return { cat: 'Speaker Turn', cls: 'chip-speaker' };
+            return { cat: 'Span Tag', cls: 'chip-paralinguistic' };
+        }
+        return { cat: 'Unknown Tag', cls: 'chip-other' };
+    }
+
+    function processRSML(text) {
+        let errors = [];
+        const tagRegex = /([&@][a-zA-Z0-9_-]+-(?:start|end)|@[a-zA-Z0-9_-]+|#[a-zA-Z0-9_-]+(?::[a-zA-Z0-9_-]+)?\[.*?\]\(.*?\)|![a-zA-Z0-9_-]+\[.*?\]\(.*?\))/g;
+        
+        let tokens = [];
+        let lastIndex = 0;
+        let match;
+        
+        while ((match = tagRegex.exec(text)) !== null) {
+            if (match.index > lastIndex) {
+                tokens.push({ type: 'text', value: text.substring(lastIndex, match.index) });
+            }
+            tokens.push({ type: 'tag', value: match[0] });
+            lastIndex = tagRegex.lastIndex;
+        }
+        if (lastIndex < text.length) {
+            tokens.push({ type: 'text', value: text.substring(lastIndex) });
+        }
+        
+        let openStack = [];
+        let errorTokens = new Set();
+        
+        for (let i = 0; i < tokens.length; i++) {
+            let t = tokens[i];
+            if (t.type === 'tag') {
+                if (t.value.endsWith('-start')) {
+                    let base = t.value.substring(1, t.value.length - 6);
+                    openStack.push({ base: base, index: i, value: t.value });
+                } else if (t.value.endsWith('-end')) {
+                    let base = t.value.substring(1, t.value.length - 4);
+                    if (openStack.length > 0 && openStack[openStack.length - 1].base === base) {
+                        openStack.pop();
+                    } else {
+                        errorTokens.add(i);
+                        errors.push(`Unmatched ${t.value}`);
+                    }
+                }
+            }
+        }
+        
+        openStack.forEach(st => {
+            errorTokens.add(st.index);
+            errors.push(`Unmatched ${st.value}`);
+        });
+        
+        let html = "";
+        
+        for (let i = 0; i < tokens.length; i++) {
+            let t = tokens[i];
+            if (t.type === 'text') {
+                html += t.value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            } else {
+                let val = t.value;
+                let isError = errorTokens.has(i);
+                
+                if (isError) {
+                    html += `<span class="chip chip-error" title="Syntax Error"><i class="fas fa-exclamation-triangle chip-icon"></i>${val.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</span>`;
+                    continue;
+                }
+                
+                if (val.startsWith('&s') && val.endsWith('-start')) {
+                    let speakerNum = val.substring(2, val.indexOf('-start'));
+                    html += `<div class="speaker-label">SPEAKER ${speakerNum}:</div>`;
+                    continue;
+                }
+                if (val.startsWith('&s') && val.endsWith('-end')) {
+                    continue;
+                }
+                
+                if (val.startsWith('#')) {
+                    let m = val.match(/#([a-zA-Z0-9_-]+)(?::[a-zA-Z0-9_-]+)?\[.*?\]\((.*?)\)/);
+                    if (m) {
+                        html += `<span class="chip chip-bracket" title="Entity: ${m[1]}"><i class="fas fa-location-arrow chip-icon"></i>${m[2]}</span>`;
+                    } else {
+                        html += val;
+                    }
+                } else if (val.startsWith('!')) {
+                    let m = val.match(/!([a-zA-Z0-9_-]+)\[.*?\]\((.*?)\)/);
+                    if (m) {
+                        html += `<span class="chip chip-language" title="Language: ${m[1]}"><i class="fas fa-language chip-icon"></i>${m[2]}</span>`;
+                    } else {
+                        html += val;
+                    }
+                } else if (val.endsWith('-start') || val.endsWith('-end')) {
+                    const cleanTag = val.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+                    const catInfo = getTagCategory(val.replace(/-(start|end)$/, '').substring(1));
+                    html += `<span class="chip ${catInfo.cls}" title="${catInfo.cat}">${cleanTag}</span>`;
+                } else if (val.startsWith('@')) {
+                    const catInfo = getTagCategory(val.substring(1));
+                    html += `<span class="chip ${catInfo.cls}" title="${catInfo.cat}">${val}</span>`;
+                } else {
+                    html += val;
+                }
+            }
+        }
+        
+        return { html, errors };
+    }
+
+    function updateNormalizedPreview(id) {
+        const textEl = document.getElementById(`text-${id}`);
+        const previewEl = document.getElementById(`rich-preview-${id}`);
+        const errorEl = document.getElementById(`error-${id}`);
+        
+        if (textEl && previewEl) {
+            const result = processRSML(textEl.value);
+            previewEl.innerHTML = result.html;
+            
+            if (errorEl) {
+                if (result.errors.length > 0) {
+                    errorEl.style.display = 'block';
+                    errorEl.innerHTML = `<i class="fas fa-times" style="margin-right:4px;"></i>${result.errors.length} error(s): ${result.errors.join(', ')}`;
+                } else {
+                    errorEl.style.display = 'none';
+                    errorEl.innerHTML = '';
+                }
+            }
+            
+            const labelEl = document.getElementById(`region-text-${id}`);
+            if (labelEl) {
+                labelEl.textContent = textEl.value;
+            }
+        }
+    }
+
+    function sendSaveEvent() {
+      // Send back segments JSON
+      sendValue({
+        action: 'save',
+        segments: currentSegments
+      });
+    }
+
+    function sendAction(actionName) {
+      sendValue({
+        action: actionName,
+        segments: currentSegments
+      });
+    }
+
+    // Listen for messages from Streamlit
+    window.addEventListener("message", function(event) {
+      if (event.data.type === "streamlit:render") {
+        const args = event.data.args;
+        
+        if (args.task_id) {
+            document.getElementById('taskTitle').innerText = "Task #" + args.task_id;
+        }
+
+        // Initialize once
+        if (args.audio_url && (!wavesurfer || wavesurfer.media.src !== args.audio_url)) {
+            initWavesurfer(args.audio_url);
+        }
+        
+        // If segments passed from python
+        if (args.segments && Array.isArray(args.segments)) {
+            currentSegments = args.segments;
+            if (audioReady) {
+               renderSegments();
+            }
+        }
+
+        // Set frame height on render
+        setFrameHeight(750); // Fixed height for this UI
+      }
+    });
+
+    // Tell Streamlit we are ready
+    window.parent.postMessage({
+      isStreamlitMessage: true,
+      type: "streamlit:componentReady",
+      apiVersion: 1,
+    }, "*");
+
+  </script>
+</body>
+</html>
