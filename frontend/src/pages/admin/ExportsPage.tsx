@@ -11,9 +11,8 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { api, API_BASE_URL } from '../../services/api';
+import { api } from '../../services/api';
 import { formatDurationHoursMins } from '../../utils/time';
-import { useAuthStore } from '../../store/auth';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -82,7 +81,6 @@ async function fetchCompletedItems(): Promise<AudioItem[]> {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function ExportsPage() {
-  const { token } = useAuthStore();
   const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set());
   const [downloadErrors, setDownloadErrors] = useState<Record<string, string>>({});
   const [downloadSuccess, setDownloadSuccess] = useState<Set<string>>(new Set());
