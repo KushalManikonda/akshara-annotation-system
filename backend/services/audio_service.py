@@ -248,7 +248,7 @@ def upload_audio(uploaded_file, language: str, uploaded_by: str, extra_transcrip
             if not extracted_file.is_file():
                 continue
             ext = extracted_file.suffix.lower()
-            if ext in config.SUPPORTED_AUDIO_FORMATS:
+            if ext in settings.SUPPORTED_AUDIO_FORMATS:
                 audio_files_to_process.append(extracted_file)
             elif ext == ".json" and extracted_file.name.lower() not in ["metadata.json", "config.json"]:
                 json_transcript_files.append(extracted_file)
