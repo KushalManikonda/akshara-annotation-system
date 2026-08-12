@@ -331,6 +331,7 @@ def upload_audio(uploaded_file, language: str, uploaded_by: str, extra_transcrip
                     logger.info(f"Uploaded {storage_key} to Supabase Storage")
                 except Exception as e:
                     logger.error(f"Failed to upload {storage_key} to Supabase Storage: {e}")
+                    raise RuntimeError(f"Supabase Storage Upload Error: {e}")
 
 
             af_id = _extract_id_from_path(extracted_file)
@@ -395,7 +396,7 @@ def upload_audio(uploaded_file, language: str, uploaded_by: str, extra_transcrip
         temp_zip.unlink(missing_ok=True)
         # Remove the local dataset folder since we fully rely on Supabase in production
         # In development, keep it for local file streaming.
-        if getattr(config.settings, "ENVIRONMENT", "development") == "production":
+        if getattr(settings, "ENVIRONMENT", "development") == "production":
             shutil.rmtree(dataset_folder, ignore_errors=True)
 
         return True
