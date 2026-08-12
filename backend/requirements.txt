@@ -11,8 +11,7 @@ pydantic-settings==2.4.0
 
 # ── Auth ───────────────────────────────────────────────────────────────────────
 python-jose[cryptography]==3.3.0
-bcrypt==3.2.2
-passlib==1.7.4
+bcrypt
 
 # ── File Upload ────────────────────────────────────────────────────────────────
 python-multipart==0.0.9
