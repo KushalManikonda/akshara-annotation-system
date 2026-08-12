@@ -164,6 +164,12 @@ def _run_pipeline_background(audio_id: str, language: str, audio_file_path: str)
             logger.exception("Curation: could not persist FAILED status")
     finally:
         db.close()
+        # Clean up local file after pipeline finishes to prevent Render disk exhaustion
+        if os.path.exists(audio_file_path):
+            try:
+                os.remove(audio_file_path)
+            except Exception as e:
+                logger.warning(f"Failed to clean up {audio_file_path}: {e}")
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
