@@ -197,7 +197,7 @@ def upload_audio(uploaded_file, language: str, uploaded_by: str, extra_transcrip
         # Dataset Folder
         # --------------------------------------------
 
-        dataset_folder = BASE_AUDIO_PATH / dataset.id
+        dataset_folder = Path(BASE_AUDIO_PATH) / dataset.id
         dataset_folder.mkdir(parents=True, exist_ok=True)
 
         temp_zip = dataset_folder / uploaded_file.name
@@ -390,9 +390,8 @@ def upload_audio(uploaded_file, language: str, uploaded_by: str, extra_transcrip
         db.commit()
 
         temp_zip.unlink(missing_ok=True)
-        # We can safely remove the local dataset folder if we fully rely on Supabase
-        # But we'll leave it local for now in case of hybrid fallback.
-        # shutil.rmtree(dataset_folder, ignore_errors=True)
+        # Remove the local dataset folder since we fully rely on Supabase in production
+        shutil.rmtree(dataset_folder, ignore_errors=True)
 
         return True
 
@@ -531,7 +530,7 @@ def delete_dataset(dataset_id: str) -> tuple[bool, str]:
         db.commit()
 
         # Remove files from disk — dataset folder is BASE_AUDIO_PATH / dataset_id
-        dataset_folder = BASE_AUDIO_PATH / dataset_id
+        dataset_folder = Path(BASE_AUDIO_PATH) / str(dataset_id)
         if dataset_folder.exists():
             shutil.rmtree(dataset_folder, ignore_errors=True)
             logger.info(f"Deleted dataset folder: {dataset_folder}")
