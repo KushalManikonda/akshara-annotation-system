@@ -9,6 +9,10 @@ class AudioFileResponse(BaseModel):
     original_filename: str
     file_path: str
     audio_url: Optional[str] = None
+    # Phase 4+: portable relative path for local audio model
+    audio_relative_path: Optional[str] = None
+    # Phase 4+: 'local' | 'supabase' | None (None treated as 'supabase')
+    audio_storage_type: Optional[str] = None
     language: str
     original_transcript: Optional[str] = None
     english_translation: Optional[str] = None

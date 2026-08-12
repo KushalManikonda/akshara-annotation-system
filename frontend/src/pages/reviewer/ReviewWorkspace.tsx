@@ -7,6 +7,7 @@ import { useAuthStore } from '../../store/auth';
 import VersionHistoryPanel from '../../components/VersionHistoryPanel';
 import WaveformPlayer from '../../components/WaveformPlayer';
 import type { WaveformPlayerRef } from '../../components/WaveformPlayer';
+import LocalAudioPicker from '../../components/LocalAudioPicker';
 
 export default function ReviewWorkspace() {
   const { id } = useParams();
@@ -18,6 +19,7 @@ export default function ReviewWorkspace() {
   const [originalSegments, setOriginalSegments] = useState<any[]>([]);
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [comments, setComments] = useState('');
+  const [localUrl, setLocalUrl] = useState<string | null>(null);
   const waveformRef = useRef<WaveformPlayerRef>(null);
 
   const { data: task, isLoading: isTaskLoading } = useQuery({
@@ -26,10 +28,13 @@ export default function ReviewWorkspace() {
       const res = await api.get(`/audio/${id}`);
       return res.data;
     },
+    },
     enabled: !!id,
   });
 
-  const audioUrl = token && id ? `${API_BASE_URL}/audio/${id}/stream?token=${token}` : (task?.audio_url || '');
+  const isLocal = task?.audio_storage_type === 'local';
+  const streamUrl = token && id ? `${API_BASE_URL}/audio/${id}/stream?token=${token}` : (task?.audio_url || '');
+  const activeAudioUrl = isLocal ? (localUrl || '') : streamUrl;
 
   useEffect(() => {
     if (task?.reviewed_by_me) {
@@ -173,12 +178,28 @@ export default function ReviewWorkspace() {
                 {task.original_filename}
               </div>
             </div>
+            {isLocal && localUrl && (
+              <LocalAudioPicker
+                audioRelativePath={task.audio_relative_path || ''}
+                audioFilename={task.original_filename || task.filename || ''}
+                onFileSelected={setLocalUrl}
+                onCleared={() => setLocalUrl(null)}
+                compact={true}
+              />
+            )}
           </div>
 
-          {audioUrl ? (
+          {isLocal && !localUrl ? (
+            <LocalAudioPicker
+              audioRelativePath={task.audio_relative_path || ''}
+              audioFilename={task.original_filename || task.filename || ''}
+              onFileSelected={setLocalUrl}
+              onCleared={() => setLocalUrl(null)}
+            />
+          ) : activeAudioUrl ? (
             <WaveformPlayer
               ref={waveformRef}
-              audioUrl={audioUrl}
+              audioUrl={activeAudioUrl}
               regions={segments.map(s => ({ id: s.id, start: s.start || 0, end: s.end || (s.start || 0) + 5 }))}
               onRegionUpdate={handleRegionUpdate}
               onRegionClicked={(id) => {

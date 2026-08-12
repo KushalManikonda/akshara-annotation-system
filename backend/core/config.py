@@ -86,6 +86,15 @@ class Settings(BaseSettings):
             return [fmt.strip() for fmt in v.split(",") if fmt.strip()]
         return v
 
+    # ── Local Audio Root ──────────────────────────────────────────────────────────
+    # Optional: server-side path to the root directory containing audio datasets.
+    # Used ONLY for server-side ZIP export to include the original WAV.
+    # NOT used for browser-based audio playback (users pick files locally).
+    # Example (Linux):   AUDIO_ROOT_DIR=/data/akshara-audio
+    # Example (Windows): AUDIO_ROOT_DIR=C:\AksharaAudio
+    # If empty, exports will include a WAV_NOT_AVAILABLE.txt note instead of the WAV.
+    AUDIO_ROOT_DIR: str = ""
+
     # ── Task Locking ──────────────────────────────────────────────
     TASK_LOCK_TIMEOUT_MINUTES: int = 30
     TASK_LOCK_HEARTBEAT_INTERVAL_SECONDS: int = 60

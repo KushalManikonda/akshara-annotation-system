@@ -282,9 +282,12 @@ def export_annotation_srt(
 ):
     """
     Export a fully approved annotation as a ZIP archive containing:
-      1. original_audio.wav  — the original uploaded WAV (not processed/denoised audio)
-      2. original_transcript.json — the ASR-generated transcript before annotation
-      3. annotated_transcript.srt — the final annotated transcript in SRT format
+      1. {stem}.wav               — original WAV (from local AUDIO_ROOT_DIR or Supabase)
+      2. {stem}.json              — immutable original transcript from DB
+      3. {stem}.srt               — final annotated transcript in SRT format
+
+    If the WAV is locally stored and AUDIO_ROOT_DIR is not configured on the server,
+    a WAV_NOT_AVAILABLE.txt note is included instead.
 
     SRT timestamps use comma for milliseconds (HH:MM:SS,mmm).
     Supports Hindi and Telugu Unicode characters via UTF-8 encoding.
@@ -348,19 +351,52 @@ def export_annotation_srt(
     srt_content = _build_srt(segments)
     srt_bytes = srt_content.encode("utf-8")
 
+    # ── Derive stem for consistent file naming ────────────────────────────────
+    stem = Path(audio.original_filename).stem if audio.original_filename else f"audio_{audio_id}"
+    import re
+    safe_stem = re.sub(r'[^\w\-_.]', '_', stem)
+    audio_ext = Path(audio.original_filename).suffix if audio.original_filename else ".wav"
+
     # ── Resolve original audio bytes ──────────────────────────────────────────
-    audio_bytes = b""
-    if audio.file_path and os.path.exists(audio.file_path):
-        with open(audio.file_path, "rb") as f:
-            audio_bytes = f.read()
+    from backend.core.config import settings
+    audio_bytes: bytes | None = None
+    wav_note: str | None = None
+
+    storage_type = audio.audio_storage_type or ("local" if not audio.audio_url else "supabase")
+
+    if storage_type == "local":
+        # Try server-side AUDIO_ROOT_DIR first
+        if settings.AUDIO_ROOT_DIR and audio.audio_relative_path:
+            server_wav = Path(settings.AUDIO_ROOT_DIR) / audio.audio_relative_path
+            if server_wav.exists():
+                audio_bytes = server_wav.read_bytes()
+            else:
+                wav_note = (
+                    f"WAV file not found on the server.\n"
+                    f"Expected server path: {settings.AUDIO_ROOT_DIR}/{audio.audio_relative_path}\n\n"
+                    f"To include the WAV in your export:\n"
+                    f"  1. Mount the audio dataset on the server at AUDIO_ROOT_DIR.\n"
+                    f"  2. Ensure the file exists at: {audio.audio_relative_path}\n\n"
+                    f"Alternatively, add the WAV file manually to your export:\n"
+                    f"  Filename: {safe_stem}{audio_ext}\n"
+                    f"  Relative path: {audio.audio_relative_path or ''}\n"
+                )
+        else:
+            relative = audio.audio_relative_path or f"{audio.language}/{safe_stem}{audio_ext}"
+            wav_note = (
+                f"This task uses the local audio model.\n"
+                f"The WAV file is not stored on the server.\n\n"
+                f"To include the WAV in your export:\n"
+                f"  Set the AUDIO_ROOT_DIR environment variable on the server, or\n"
+                f"  manually add the file:\n"
+                f"    Filename: {safe_stem}{audio_ext}\n"
+                f"    Local relative path: {relative}\n"
+            )
     elif audio.audio_url:
-        # For Supabase-hosted files, fetch via signed URL
+        # Supabase-hosted legacy audio
         try:
-            from backend.core.config import settings
             from supabase import create_client
             supa = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
-            # audio_url is stored as a storage key (e.g. "dataset-id/filename.wav")
-            # Legacy rows may have stored a full URL — extract the path from those
             storage_key = audio.audio_url if not audio.audio_url.startswith("http") else "/".join(audio.audio_url.split("/")[-2:])
             signed_result = supa.storage.from_(settings.STORAGE_BUCKET).create_signed_url(
                 storage_key,
@@ -377,27 +413,29 @@ def export_annotation_srt(
                     audio_bytes = resp.read()
         except Exception as e:
             logger.warning(f"SRT export: could not fetch audio from Supabase for {audio_id}: {e}")
+            wav_note = f"Failed to retrieve audio from Supabase Storage: {e}\nPlease add the WAV manually."
+    elif audio.file_path and os.path.exists(audio.file_path):
+        with open(audio.file_path, "rb") as f:
+            audio_bytes = f.read()
 
     # ── Original transcript JSON (immutable) ──────────────────────────────────
     original_transcript_bytes = (audio.original_transcript or "[]").encode("utf-8")
 
     # ── Build ZIP ─────────────────────────────────────────────────────────────
-    # Use a safe stem for the zip filename
-    safe_stem = Path(audio.original_filename).stem if audio.original_filename else f"audio_{audio_id}"
-    # Remove characters unsafe for filenames
-    import re
-    safe_stem = re.sub(r'[^\w\-_.]', '_', safe_stem)
-
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-        # 1. Original audio (canonical WAV — not processed/denoised)
-        zf.writestr("original_audio.wav", audio_bytes)
+        # 1. Original audio WAV or a note explaining how to get it
+        if audio_bytes is not None:
+            zf.writestr(f"{safe_stem}{audio_ext}", audio_bytes)
+        else:
+            note_text = wav_note or "WAV file not available."
+            zf.writestr("WAV_NOT_AVAILABLE.txt", note_text.encode("utf-8"))
 
         # 2. Original transcript JSON (ASR output — immutable, never overwritten)
-        zf.writestr("original_transcript.json", original_transcript_bytes)
+        zf.writestr(f"{safe_stem}.json", original_transcript_bytes)
 
         # 3. Annotated transcript in SRT format
-        zf.writestr("annotated_transcript.srt", srt_bytes)
+        zf.writestr(f"{safe_stem}.srt", srt_bytes)
 
     zip_buffer.seek(0)
     zip_filename = f"export_{safe_stem}.zip"
@@ -407,3 +445,4 @@ def export_annotation_srt(
         media_type="application/zip",
         headers={"Content-Disposition": f"attachment; filename={zip_filename}"},
     )
+

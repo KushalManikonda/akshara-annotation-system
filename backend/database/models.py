@@ -9,6 +9,8 @@ Phase 2 changes (non-breaking additions only):
 - Added TaskLock model for concurrent editing prevention (Phase 7).
 - Added SuperAdminAuditLog model for immutable audit trail (Phase 2).
 - audio_url column added to AudioFile for Supabase Storage URLs (Phase 3).
+- audio_relative_path: portable relative path e.g. 'Telugu/telugu1.wav' (Phase 4).
+- audio_storage_type: 'local' | 'supabase' — NULL treated as 'supabase' for backward compat (Phase 4).
 
 All existing model fields, table names, and relationships are preserved.
 """
@@ -215,6 +217,23 @@ class AudioFile(Base):
     # Phase 3+: Supabase Storage signed/public URL.
     # NULL during Phase 1–2; populated after storage migration.
     audio_url = Column(
+        String,
+        nullable=True
+    )
+
+    # Phase 4+: Portable relative audio path stored in DB (no machine-specific prefix).
+    # Example: 'Telugu/telugu1.wav'
+    # Resolved at runtime as: AUDIO_ROOT_DIR + '/' + audio_relative_path
+    # NULL for old records that pre-date this column.
+    audio_relative_path = Column(
+        String,
+        nullable=True
+    )
+
+    # Phase 4+: 'local' (WAV stored outside Supabase, user picks locally in browser)
+    # or 'supabase' (WAV uploaded to Supabase Storage).
+    # NULL for old records — treated as 'supabase' by the application for backward compat.
+    audio_storage_type = Column(
         String,
         nullable=True
     )

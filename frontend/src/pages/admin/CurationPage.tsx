@@ -7,6 +7,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { api } from '../../services/api';
+import ImportTranscriptModal from '../../components/admin/ImportTranscriptModal';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -110,6 +111,7 @@ export default function CurationPage() {
     completedAt: null,
   });
   const [isDragging, setIsDragging] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -255,12 +257,30 @@ export default function CurationPage() {
       `}</style>
 
       {/* Header */}
-      <div>
-        <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>Curation Pipeline</h1>
-        <p style={{ margin: '0.25rem 0 0', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
-          Upload audio, run the ASR pipeline, and add to the annotation queue.
-        </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>Curation Pipeline</h1>
+          <p style={{ margin: '0.25rem 0 0', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+            Upload audio, run the ASR pipeline, and add to the annotation queue.
+          </p>
+        </div>
+        <button 
+          className="btn btn-secondary" 
+          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-glass)' }}
+          onClick={() => setShowImportModal(true)}
+        >
+          📥 Import Transcript (Local Audio)
+        </button>
       </div>
+
+      {showImportModal && (
+        <ImportTranscriptModal 
+          onClose={() => setShowImportModal(false)}
+          onSuccess={(data) => {
+            // Handle success if needed, e.g. reload a list or show a message
+          }}
+        />
+      )}
 
       {/* Language Selection */}
       <div className="card glass-panel" style={{ padding: '1.5rem' }}>

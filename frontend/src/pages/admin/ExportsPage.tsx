@@ -152,9 +152,9 @@ export default function ExportsPage() {
           </div>
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
             {[
-              { icon: '🎵', label: 'original_audio.wav' },
-              { icon: '📄', label: 'original_transcript.json' },
-              { icon: '🎬', label: 'annotated_transcript.srt' },
+              { icon: '🎵', label: '{name}.wav' },
+              { icon: '📄', label: '{name}.json' },
+              { icon: '🎬', label: '{name}.srt' },
             ].map((f) => (
               <span key={f.label} style={{
                 padding: '0.2rem 0.6rem',
@@ -167,6 +167,9 @@ export default function ExportsPage() {
                 {f.icon} {f.label}
               </span>
             ))}
+          </div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem', fontStyle: 'italic' }}>
+            * Includes WAV_NOT_AVAILABLE.txt instead of WAV for local audio without AUDIO_ROOT_DIR.
           </div>
         </div>
         <div style={{ width: '1px', background: 'var(--border-glass)' }} />

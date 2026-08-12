@@ -462,3 +462,152 @@ def list_curation_items(
     # Sort newest first
     results.sort(key=lambda r: r.get("uploaded_at") or "", reverse=True)
     return results
+
+
+# ── Transcript-only import ────────────────────────────────────────────────────
+
+@router.post("/import-transcript")
+async def import_transcript(
+    transcript_file: UploadFile = File(...),
+    language: str = Form(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Import a transcript JSON file directly into the annotation queue
+    WITHOUT uploading the associated WAV to Supabase.
+
+    The WAV is expected to exist locally on each user's machine.
+    The system stores only a portable relative audio reference
+    (e.g. 'Telugu/telugu1.wav') in the database.
+
+    The filename stem determines the audio mapping:
+        telugu1.json  →  Telugu/telugu1.wav  →  telugu1.srt
+
+    Security:
+        - Rejects filenames containing path traversal (../ etc.)
+        - Rejects non-.json files
+        - Validates JSON structure (must be list of segments)
+    """
+    import re as _re
+    _require_admin(current_user)
+
+    lang_clean = language.lower().strip()
+    if lang_clean not in ("hindi", "english", "telugu"):
+        raise HTTPException(status_code=400, detail="language must be 'hindi', 'english', or 'telugu'")
+
+    # ── Validate filename ─────────────────────────────────────────────────────
+    original_name = transcript_file.filename or "transcript.json"
+    p = Path(original_name)
+
+    if p.suffix.lower() != ".json":
+        raise HTTPException(status_code=400, detail="Only .json transcript files are accepted")
+
+    stem = p.stem  # e.g. "telugu1"
+
+    # Security: reject path traversal and dangerous characters
+    if ".." in stem or "/" in stem or "\\" in stem:
+        raise HTTPException(status_code=400, detail="Invalid filename: path traversal detected")
+
+    # Only allow safe filename characters (letters, digits, hyphens, underscores, Unicode)
+    if _re.search(r'[<>:"|?*\x00-\x1f]', stem):
+        raise HTTPException(status_code=400, detail="Filename contains unsafe characters")
+
+    # ── Read and validate JSON ────────────────────────────────────────────────
+    raw_bytes = await transcript_file.read()
+    try:
+        content_str = raw_bytes.decode("utf-8")
+        segments = json.loads(content_str)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON: could not parse transcript file")
+
+    if not isinstance(segments, list):
+        raise HTTPException(status_code=400, detail="Transcript JSON must be a list of segment objects")
+
+    if len(segments) == 0:
+        raise HTTPException(status_code=400, detail="Transcript has no segments")
+
+    # Validate segment structure (must have start, end, and text/transcript)
+    for i, seg in enumerate(segments[:5]):  # check first 5 only for performance
+        if not isinstance(seg, dict):
+            raise HTTPException(status_code=400, detail=f"Segment {i} is not an object")
+        if "start" not in seg or "end" not in seg:
+            raise HTTPException(status_code=400, detail=f"Segment {i} missing 'start' or 'end'")
+
+    # ── Derive portable paths ─────────────────────────────────────────────────
+    lang_capitalized = lang_clean.capitalize()
+    audio_filename = f"{stem}.wav"
+    audio_relative_path = f"{lang_capitalized}/{audio_filename}"
+    annotation_filename = f"{stem}.srt"
+
+    # ── Get or create curation dataset ────────────────────────────────────────
+    ds = _get_or_create_curation_dataset(lang_clean, db, current_user.id)
+
+    # ── Create AudioFile record ───────────────────────────────────────────────
+    audio = AudioFile(
+        dataset_id=ds.id,
+        filename=audio_filename,
+        original_filename=audio_filename,
+        # No physical file on server — portable reference only
+        file_path="",
+        audio_url=None,
+        audio_relative_path=audio_relative_path,
+        audio_storage_type="local",
+        language=lang_capitalized,
+        duration=0.0,  # unknown until user plays it locally
+        status=AudioStatus.UNASSIGNED,
+        uploaded_by=current_user.id,
+        assigned_to=None,
+        # Store the immutable original transcript
+        original_transcript=content_str,
+        metadata_json=json.dumps({
+            "import_type": "transcript_only",
+            "transcript_filename": original_name,
+            "audio_filename": audio_filename,
+            "audio_relative_path": audio_relative_path,
+            "annotation_filename": annotation_filename,
+            "imported_at": datetime.utcnow().isoformat(),
+            "imported_by": current_user.username,
+        }, ensure_ascii=False),
+    )
+    db.add(audio)
+
+    # Update dataset stats
+    ds.total_files += 1
+    db.commit()
+    db.refresh(audio)
+
+    # Audit log
+    audit = AuditLog(
+        user_id=current_user.id,
+        action=AuditAction.CREATE,
+        details=(
+            f"Transcript imported: {original_name} → audio ref: {audio_relative_path} "
+            f"[{lang_capitalized}] added to annotation queue by {current_user.username}"
+        ),
+    )
+    db.add(audit)
+    db.commit()
+
+    logger.info(
+        f"Curation: transcript {original_name} imported as audio_id={audio.id}, "
+        f"ref={audio_relative_path}, segments={len(segments)}"
+    )
+
+    return {
+        "audio_id": audio.id,
+        "transcript_filename": original_name,
+        "audio_filename": audio_filename,
+        "audio_relative_path": audio_relative_path,
+        "annotation_filename": annotation_filename,
+        "language": lang_capitalized,
+        "segments_count": len(segments),
+        "status": "UNASSIGNED",
+        "audio_storage_type": "local",
+        "message": (
+            f"Transcript imported successfully. "
+            f"Audio reference: {audio_relative_path}. "
+            f"Task is ready in the annotation queue."
+        ),
+    }
+

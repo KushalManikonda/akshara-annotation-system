@@ -171,9 +171,12 @@ def stream_audio(
     Return a redirect to the Supabase Storage signed URL for the audio file.
     Falls back to local filesystem only in development when audio_url is not set.
     Accepts token via query param for WaveSurfer compatibility.
+
+    For 'local' audio_storage_type: returns a structured 404 with audio_relative_path
+    so the frontend knows to prompt the user to select the file locally.
     """
     from backend.core.security import decode_token
-    from fastapi.responses import RedirectResponse
+    from fastapi.responses import RedirectResponse, JSONResponse
     from backend.core.config import settings
 
     # Accept token from query param OR Authorization header
@@ -193,6 +196,24 @@ def stream_audio(
     audio = db.query(AudioFile).filter(AudioFile.id == audio_id).first()
     if not audio:
         raise HTTPException(status_code=404, detail="Audio file not found")
+
+    # ── Local audio model: WAV is on the user's machine, not the server ────────
+    storage_type = audio.audio_storage_type or ("local" if not audio.audio_url else "supabase")
+    if storage_type == "local" and not audio.audio_url:
+        # Return a structured response the frontend can interpret to show the picker
+        return JSONResponse(
+            status_code=404,
+            content={
+                "detail": "LOCAL_AUDIO",
+                "audio_relative_path": audio.audio_relative_path or "",
+                "audio_filename": audio.original_filename or audio.filename or "",
+                "message": (
+                    f"This audio file is stored locally. "
+                    f"Expected path: {audio.audio_relative_path or audio.original_filename}. "
+                    f"Please select the file from your local machine."
+                ),
+            },
+        )
 
     # ── Production path: use Supabase Storage ─────────────────────────────────
     if audio.audio_url:
@@ -240,6 +261,7 @@ def stream_audio(
         media_type="audio/wav",
         headers={"Accept-Ranges": "bytes"},
     )
+
 
 
 @router.patch("/{audio_id}/start")

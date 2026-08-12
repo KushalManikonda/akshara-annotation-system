@@ -330,8 +330,12 @@ def upload_audio(uploaded_file, language: str, uploaded_by: str, extra_transcrip
                     audio_url = storage_key
                     logger.info(f"Uploaded {storage_key} to Supabase Storage")
                 except Exception as e:
-                    logger.error(f"Failed to upload {storage_key} to Supabase Storage: {e}")
-                    raise RuntimeError(f"Supabase Storage Upload Error: {e}")
+                    logger.error(
+                        f"Failed to upload {storage_key} to Supabase Storage: {e}. "
+                        f"Task will use local audio model — annotators select WAV from their machine."
+                    )
+                    # Graceful fallback: audio_url stays None; task enters queue as local
+                    audio_url = None
 
 
             af_id = _extract_id_from_path(extracted_file)
@@ -356,6 +360,9 @@ def upload_audio(uploaded_file, language: str, uploaded_by: str, extra_transcrip
                 file_path=str(destination),
 
                 audio_url=audio_url,
+
+                # Phase 4+: mark storage type so frontend knows how to play
+                audio_storage_type="supabase" if audio_url else "local",
 
                 language=language,
 

@@ -4,10 +4,13 @@ import type { Segment } from './types';
 import { useAuthStore } from '../../store/auth';
 import { API_BASE_URL } from '../../services/api';
 import { Plus, RotateCcw, Keyboard, X } from 'lucide-react';
+import LocalAudioPicker from '../LocalAudioPicker';
 
 interface AudioWorkspaceProps {
   audioId: string;
   filename?: string;
+  audioStorageType?: string;
+  audioRelativePath?: string;
   segments: Segment[];
   activeSegmentId: string | null;
   isReadOnly?: boolean;
@@ -21,6 +24,8 @@ interface AudioWorkspaceProps {
 export function AudioWorkspace({
   audioId,
   filename,
+  audioStorageType = 'supabase',
+  audioRelativePath = '',
   segments,
   activeSegmentId,
   isReadOnly = false,
@@ -32,6 +37,7 @@ export function AudioWorkspace({
   const token = useAuthStore(state => state.token);
   const playerRef = useRef<WaveformPlayerRef>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [localUrl, setLocalUrl] = useState<string | null>(null);
 
   // Derive regions from segments
   const regions = segments.map(s => ({
@@ -41,7 +47,11 @@ export function AudioWorkspace({
     color: s.done ? 'rgba(72, 187, 120, 0.25)' : 'rgba(99, 179, 237, 0.25)'
   }));
 
-  const audioUrl = token ? `${API_BASE_URL}/audio/${audioId}/stream?token=${token}` : '';
+  const streamUrl = token ? `${API_BASE_URL}/audio/${audioId}/stream?token=${token}` : '';
+  const isLocal = audioStorageType === 'local';
+  
+  // The actual URL passed to the player is either the selected local blob URL or the server stream
+  const activeAudioUrl = isLocal ? (localUrl || '') : streamUrl;
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -103,7 +113,18 @@ export function AudioWorkspace({
           🎵 <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{filename || audioId.split('-')[0]}</span>
         </h3>
         
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          {isLocal && localUrl && (
+            <div style={{ marginRight: '0.5rem' }}>
+              <LocalAudioPicker
+                audioRelativePath={audioRelativePath}
+                audioFilename={filename || ''}
+                onFileSelected={setLocalUrl}
+                onCleared={() => setLocalUrl(null)}
+                compact={true}
+              />
+            </div>
+          )}
           <button className="btn btn-secondary" onClick={onRevert} disabled={isReadOnly} title="Revert to original">
             <RotateCcw size={14} /> Revert
           </button>
@@ -116,12 +137,18 @@ export function AudioWorkspace({
         </div>
       </div>
 
-      {/* Waveform Area */}
       <div style={{ flex: 1, padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        {token ? (
+        {isLocal && !localUrl ? (
+          <LocalAudioPicker
+            audioRelativePath={audioRelativePath}
+            audioFilename={filename || ''}
+            onFileSelected={setLocalUrl}
+            onCleared={() => setLocalUrl(null)}
+          />
+        ) : token ? (
           <WaveformPlayer
             ref={playerRef}
-            audioUrl={audioUrl}
+            audioUrl={activeAudioUrl}
             regions={regions}
             activeRegionId={activeSegmentId || undefined}
             isReadOnly={isReadOnly}

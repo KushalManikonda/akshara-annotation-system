@@ -22,6 +22,8 @@ export function AnnotationWorkspace() {
   const [taskStatus, setTaskStatus] = useState<string>('ASSIGNED');
   const [reviewerComment, setReviewerComment] = useState<string | null>(null);
   const [audioFilename, setAudioFilename] = useState<string>('');
+  const [audioStorageType, setAudioStorageType] = useState<string>('supabase');
+  const [audioRelativePath, setAudioRelativePath] = useState<string>('');
   const startTime = useRef(Date.now());
 
   // Load Task and Annotation Data
@@ -39,6 +41,8 @@ export function AnnotationWorkspace() {
           setTaskStatus(audioDetails.status);
           setReviewerComment(audioDetails.last_reviewer_comment || null);
           setAudioFilename(audioDetails.original_filename || audioDetails.filename || '');
+          setAudioStorageType(audioDetails.audio_storage_type || 'supabase');
+          setAudioRelativePath(audioDetails.audio_relative_path || '');
         }
 
         let initialSegments: Segment[] = [];
@@ -374,6 +378,8 @@ export function AnnotationWorkspace() {
           <AudioWorkspace 
             audioId={id || ''}
             filename={audioFilename}
+            audioStorageType={audioStorageType}
+            audioRelativePath={audioRelativePath}
             segments={segments}
             activeSegmentId={activeSegmentId}
             isReadOnly={isReadOnly}
