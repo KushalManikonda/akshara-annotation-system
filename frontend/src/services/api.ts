@@ -1,7 +1,9 @@
 import axios from 'axios';
 import { useAuthStore } from '../store/auth';
 
-const _envUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+// Remove any trailing slashes from the environment variable to prevent double-slashes like //api
+const rawEnvUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const _envUrl = rawEnvUrl.replace(/\/+$/, '');
 export const API_BASE_URL = _envUrl.endsWith('/api') ? _envUrl : `${_envUrl}/api`;
 
 export const api = axios.create({

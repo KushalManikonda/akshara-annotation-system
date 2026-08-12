@@ -62,6 +62,33 @@ JWT access token in the `Authorization: Bearer <token>` header.
 # ── Middleware ────────────────────────────────────────────────────────────────
 configure_middleware(app)
 
+# ── Startup Events ────────────────────────────────────────────────────────────
+@app.on_event("startup")
+async def startup_event():
+    # Ensure at least one admin user exists
+    from backend.database.database import SessionLocal
+    from backend.database.models import User
+    from backend.database.enums import UserRole
+    from backend.core.security import hash_password
+    
+    db = SessionLocal()
+    try:
+        if db.query(User).count() == 0:
+            logger.info("Database is empty. Creating default 'admin' user.")
+            default_admin = User(
+                username="admin",
+                email="admin@akshara.local",
+                password_hash=hash_password("admin123"),
+                role=UserRole.SUPER_ADMIN,
+                is_active=True
+            )
+            db.add(default_admin)
+            db.commit()
+    except Exception as e:
+        logger.error(f"Failed to create default admin user: {e}")
+    finally:
+        db.close()
+
 # ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(health_router)
 app.include_router(auth_router, prefix="/api")
