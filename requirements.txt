@@ -1,7 +1,33 @@
-streamlit==1.60.0
-SQLAlchemy==2.0.51
-bcrypt==3.2.2
-pandas==3.0.5
+# Akshara Backend — Python Dependencies
+# Phase 1: Core FastAPI framework + JWT + password hashing
+# Phase 4+: Uncomment Supabase and async dependencies
 
-# Development dependencies
-pytest
+# ── Web Framework ──────────────────────────────────────────────────────────────
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+
+# ── Settings ───────────────────────────────────────────────────────────────────
+pydantic-settings==2.4.0
+
+# ── Auth ───────────────────────────────────────────────────────────────────────
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# ── File Upload ────────────────────────────────────────────────────────────────
+python-multipart==0.0.9
+
+# ── Database (shared with Streamlit app) ───────────────────────────────────────
+SQLAlchemy==2.0.51
+# Phase 2: PostgreSQL driver
+psycopg2-binary>=2.9.9
+
+# ── Supabase (Phase 2+) ────────────────────────────────────────────────────────
+supabase==2.7.4
+
+# ── Alembic (Phase 2) ──────────────────────────────────────────────────────────
+alembic==1.13.2
+
+# ── Testing ────────────────────────────────────────────────────────────────────
+pytest==8.3.2
+pytest-asyncio==0.23.8
+httpx==0.27.2        # AsyncClient for FastAPI tests
