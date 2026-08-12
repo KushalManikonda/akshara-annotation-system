@@ -309,25 +309,28 @@ def upload_audio(uploaded_file, language: str, uploaded_by: str, extra_transcrip
             # --------------------------------------------
             # Upload to Supabase Storage
             # --------------------------------------------
+            # ── Upload to Supabase Storage ───────────────────────────────────
             audio_url = None
             if supabase:
                 # Use a deterministic, portable storage key: dataset_id/filename
-                # This is NOT environment-specific and survives across deploys
+                # Store only the KEY (not full URL) so signed URL generation works correctly
                 storage_key = f"{dataset.id}/{unique_name}"
                 content_type = "audio/mpeg"
                 if extension == ".wav": content_type = "audio/wav"
                 elif extension == ".flac": content_type = "audio/flac"
-                
-                with open(destination, "rb") as f:
-                    try:
+
+                try:
+                    with open(destination, "rb") as f:
                         supabase.storage.from_(STORAGE_BUCKET).upload(
                             path=storage_key,
                             file=f,
                             file_options={"content-type": content_type}
                         )
-                        audio_url = supabase.storage.from_(STORAGE_BUCKET).get_public_url(storage_key)
-                    except Exception as e:
-                        logger.error(f"Failed to upload {storage_key} to Supabase: {e}")
+                    # Store the storage KEY (not full URL) — signed URLs are generated on demand
+                    audio_url = storage_key
+                    logger.info(f"Uploaded {storage_key} to Supabase Storage")
+                except Exception as e:
+                    logger.error(f"Failed to upload {storage_key} to Supabase Storage: {e}")
 
 
             af_id = _extract_id_from_path(extracted_file)

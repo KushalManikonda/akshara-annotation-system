@@ -139,6 +139,7 @@ async def _release_abandoned_tasks():
                 db.query(AudioFile)
                 .filter(
                     AudioFile.status == AudioStatus.IN_PROGRESS,
+                    AudioFile.last_heartbeat_at.isnot(None),
                     AudioFile.last_heartbeat_at <= progress_cutoff,
                 )
                 .all()

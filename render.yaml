@@ -1,0 +1,49 @@
+services:
+  # Backend: FastAPI Web Service
+  - type: web
+    name: akshara-backend
+    runtime: python
+    rootDir: .
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHONPATH
+        value: .
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: STORAGE_BUCKET
+        value: audio-files
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "15"
+      - key: REFRESH_TOKEN_EXPIRE_DAYS
+        value: "7"
+    healthCheckPath: /api/health
+    autoDeploy: true
+
+  # Frontend: React Static Site
+  - type: web
+    name: akshara-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        sync: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    autoDeploy: true

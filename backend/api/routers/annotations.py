@@ -201,18 +201,23 @@ def export_annotation(
             with open(audio.file_path, "rb") as f:
                 audio_bytes = f.read()
         elif audio.audio_url:
-            # For Supabase-hosted files, fetch via signed URL if possible
+            # For Supabase-hosted files, fetch via signed URL
             try:
                 from backend.core.config import settings
                 from supabase import create_client
                 supa = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
-                signed = supa.storage.from_(settings.STORAGE_BUCKET).create_signed_url(
-                    audio.audio_url if not audio.audio_url.startswith("http") else audio.audio_url.split("/")[-1],
+                storage_key = audio.audio_url if not audio.audio_url.startswith("http") else "/".join(audio.audio_url.split("/")[-2:])
+                signed_result = supa.storage.from_(settings.STORAGE_BUCKET).create_signed_url(
+                    storage_key,
                     3600,
                 )
-                if signed and signed.get("signedURL"):
+                if isinstance(signed_result, dict):
+                    signed_url = signed_result.get("signedURL") or signed_result.get("signedUrl") or signed_result.get("signed_url")
+                else:
+                    signed_url = signed_result
+                if signed_url and signed_url.startswith("http"):
                     import urllib.request
-                    with urllib.request.urlopen(signed["signedURL"]) as resp:
+                    with urllib.request.urlopen(signed_url) as resp:
                         audio_bytes = resp.read()
             except Exception as e:
                 logger.warning(f"RSML export: could not fetch audio from Supabase for {audio_id}: {e}")
@@ -349,18 +354,26 @@ def export_annotation_srt(
         with open(audio.file_path, "rb") as f:
             audio_bytes = f.read()
     elif audio.audio_url:
-        # For Supabase-hosted files, fetch via signed URL if possible
+        # For Supabase-hosted files, fetch via signed URL
         try:
             from backend.core.config import settings
             from supabase import create_client
             supa = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
-            signed = supa.storage.from_(settings.STORAGE_BUCKET).create_signed_url(
-                audio.audio_url if not audio.audio_url.startswith("http") else audio.audio_url.split("/")[-1],
+            # audio_url is stored as a storage key (e.g. "dataset-id/filename.wav")
+            # Legacy rows may have stored a full URL — extract the path from those
+            storage_key = audio.audio_url if not audio.audio_url.startswith("http") else "/".join(audio.audio_url.split("/")[-2:])
+            signed_result = supa.storage.from_(settings.STORAGE_BUCKET).create_signed_url(
+                storage_key,
                 3600,
             )
-            if signed and signed.get("signedURL"):
+            if isinstance(signed_result, dict):
+                signed_url = signed_result.get("signedURL") or signed_result.get("signedUrl") or signed_result.get("signed_url")
+            else:
+                signed_url = signed_result
+
+            if signed_url and signed_url.startswith("http"):
                 import urllib.request
-                with urllib.request.urlopen(signed["signedURL"]) as resp:
+                with urllib.request.urlopen(signed_url) as resp:
                     audio_bytes = resp.read()
         except Exception as e:
             logger.warning(f"SRT export: could not fetch audio from Supabase for {audio_id}: {e}")

@@ -25,7 +25,7 @@ from backend.core.security import (
     verify_password,
 )
 from backend.services.user_service import get_user_by_username
-from backend.database.models import SessionToken
+from backend.database.models import SessionToken, User
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -37,14 +37,24 @@ _COOKIE_MAX_AGE = settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60  # seconds
 
 def _set_refresh_cookie(response: Response, raw_token: str) -> None:
     is_production = settings.ENVIRONMENT == "production"
+    # Cross-origin deployments (frontend on one Render domain, backend on another)
+    # require SameSite=none and Secure=True so the browser sends the cookie on
+    # cross-site requests (withCredentials: true in axios).
+    # In development we use SameSite=lax (no HTTPS needed).
+    if is_production:
+        samesite_value = "none"
+        secure_value = True
+    else:
+        samesite_value = "lax"
+        secure_value = False
     response.set_cookie(
         key=_COOKIE_NAME,
         value=raw_token,
         httponly=True,
-        secure=is_production,   # True in production (HTTPS), False in dev (HTTP)
-        samesite="lax",         # Lax is safe for same-origin proxied requests (Vercel → Render)
+        secure=secure_value,
+        samesite=samesite_value,
         max_age=_COOKIE_MAX_AGE,
-        path="/api/auth",       # Scoped — cookie only sent to auth endpoints
+        path="/api/auth",  # Scoped — cookie only sent to auth endpoints
     )
 
 
@@ -92,7 +102,8 @@ def login(
     Returns access_token in JSON (short-lived, 15 min).
     Sets an HttpOnly refresh_token cookie (long-lived, 7 days).
     """
-    user = get_user_by_username(form_data.username)
+    # Look up user within this endpoint's DB session so last_login update is tracked correctly
+    user = db.query(User).filter(User.username == form_data.username).first()
     if not user or not verify_password(form_data.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

@@ -194,25 +194,32 @@ def stream_audio(
     if not audio:
         raise HTTPException(status_code=404, detail="Audio file not found")
 
-    # ── Production path: use Supabase Storage URL ─────────────────────────────
+    # ── Production path: use Supabase Storage ─────────────────────────────────
     if audio.audio_url:
-        # If it's already a full URL (public bucket), redirect directly
+        # If it's already a full URL (public bucket / legacy), redirect directly
         if audio.audio_url.startswith("http"):
             return RedirectResponse(url=audio.audio_url, status_code=302)
 
-        # If it's a storage key (path within bucket), generate a signed URL
+        # It's a storage key (path within bucket) → generate a signed URL
         try:
             from supabase import create_client
             supa = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
-            signed = supa.storage.from_(settings.STORAGE_BUCKET).create_signed_url(
+            signed_result = supa.storage.from_(settings.STORAGE_BUCKET).create_signed_url(
                 audio.audio_url,
                 settings.AUDIO_URL_EXPIRY_SECONDS,
             )
-            if signed and signed.get("signedURL"):
-                return RedirectResponse(url=signed["signedURL"], status_code=302)
+            # supabase-py v2 returns the URL directly as a string, or wrapped in a dict
+            if isinstance(signed_result, dict):
+                signed_url = signed_result.get("signedURL") or signed_result.get("signedUrl") or signed_result.get("signed_url")
+            else:
+                signed_url = signed_result  # v2 sometimes returns str directly
+
+            if signed_url and signed_url.startswith("http"):
+                return RedirectResponse(url=signed_url, status_code=302)
+            raise ValueError(f"Unexpected signed URL response: {signed_result}")
         except Exception as e:
-            logger.error(f"Failed to generate signed URL for {audio_id}: {e}")
-            raise HTTPException(status_code=500, detail="Failed to generate audio URL")
+            logger.error(f"Failed to generate signed URL for audio {audio_id}: {e}")
+            raise HTTPException(status_code=500, detail="Failed to generate audio URL. Please contact admin.")
 
     # ── Development fallback: local filesystem ────────────────────────────────
     if settings.ENVIRONMENT == "production":
