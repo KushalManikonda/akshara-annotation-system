@@ -28,7 +28,6 @@ export default function ReviewWorkspace() {
       const res = await api.get(`/audio/${id}`);
       return res.data;
     },
-    },
     enabled: !!id,
   });
 
