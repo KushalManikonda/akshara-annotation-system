@@ -276,7 +276,7 @@ export default function CurationPage() {
       {showImportModal && (
         <ImportTranscriptModal 
           onClose={() => setShowImportModal(false)}
-          onSuccess={(data) => {
+          onSuccess={() => {
             // Handle success if needed, e.g. reload a list or show a message
           }}
         />
