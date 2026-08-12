@@ -391,7 +391,9 @@ def upload_audio(uploaded_file, language: str, uploaded_by: str, extra_transcrip
 
         temp_zip.unlink(missing_ok=True)
         # Remove the local dataset folder since we fully rely on Supabase in production
-        shutil.rmtree(dataset_folder, ignore_errors=True)
+        # In development, keep it for local file streaming.
+        if getattr(config.settings, "ENVIRONMENT", "development") == "production":
+            shutil.rmtree(dataset_folder, ignore_errors=True)
 
         return True
 
