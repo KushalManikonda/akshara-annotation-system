@@ -196,11 +196,28 @@ def export_annotation(
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
         # 1. Original Audio
+        audio_bytes = b""
         if audio.file_path and os.path.exists(audio.file_path):
             with open(audio.file_path, "rb") as f:
-                zip_file.writestr(f"{stem}{audio_ext}", f.read())
-        else:
-            zip_file.writestr(f"{stem}{audio_ext}", b"")
+                audio_bytes = f.read()
+        elif audio.audio_url:
+            # For Supabase-hosted files, fetch via signed URL if possible
+            try:
+                from backend.core.config import settings
+                from supabase import create_client
+                supa = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
+                signed = supa.storage.from_(settings.STORAGE_BUCKET).create_signed_url(
+                    audio.audio_url if not audio.audio_url.startswith("http") else audio.audio_url.split("/")[-1],
+                    3600,
+                )
+                if signed and signed.get("signedURL"):
+                    import urllib.request
+                    with urllib.request.urlopen(signed["signedURL"]) as resp:
+                        audio_bytes = resp.read()
+            except Exception as e:
+                logger.warning(f"RSML export: could not fetch audio from Supabase for {audio_id}: {e}")
+
+        zip_file.writestr(f"{stem}{audio_ext}", audio_bytes)
 
         # 2. Original Transcript JSON
         orig_transcript = audio.original_transcript or "{}"
