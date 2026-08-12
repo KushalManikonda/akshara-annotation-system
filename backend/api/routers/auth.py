@@ -118,7 +118,7 @@ def login(
     db.commit()
 
     access_token = create_access_token(
-        data={"sub": user.id, "role": user.role.value},
+        data={"sub": user.id, "role": user.role.value if hasattr(user.role, 'value') else str(user.role)},
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
     )
     raw_refresh = _create_and_persist_refresh_token(user.id, db)
